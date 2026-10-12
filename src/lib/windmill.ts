@@ -18,7 +18,7 @@ export async function runWindmill(job:AutomationJob,config:ReturnType<typeof win
   let data:unknown;
   try{data=await readBoundedJson(new Request('http://local/result',{method:'POST',body:response.body,duplex:'half'} as RequestInit));}
   catch(error){if(controller.signal.aborted)throw new WindmillError('TIMEOUT',true);if(error instanceof SyntaxError||error instanceof BodyTooLarge||error instanceof TypeError)throw new WindmillError('INVALID_RESULT_BODY',false);throw new WindmillError('NETWORK_ERROR',true);}
-  try{return validateAutomationResult(job,data);}catch{throw new WindmillError('INVALID_RESULT',false);}
+  try{return validateAutomationResult(job,data,'windmill');}catch{throw new WindmillError('INVALID_RESULT',false);}
  }catch(error){
   if(error instanceof WindmillError)throw error;
   throw new WindmillError(controller.signal.aborted?'TIMEOUT':'NETWORK_ERROR',true);

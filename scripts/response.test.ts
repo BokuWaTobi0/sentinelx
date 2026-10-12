@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { applyMigrations } from '../src/lib/migrations';
 import { claimAutomation,settleAutomation } from '../src/lib/automation';
 import { requestResponse,decideResponse } from '../src/lib/response';
+import { runLocal } from '../src/lib/automation-provider';
 import type { SqlClient } from '../src/lib/sql-client';
 import type { QueryResultRow } from 'pg';
 import type { Role } from '../src/lib/rbac';
@@ -62,5 +63,24 @@ test('response permissions, independent review, atomic receipts, duplicate preve
   await db.query('UPDATE users SET disabled=true WHERE id=$1',[admin.id]);
   await assert.rejects(decideResponse(db,admin,{...decision,requestId:retryId}),/unavailable/);
   await assert.rejects(requestResponse(db,analyst,{...requestInput,reason:'short'}));
+ }finally{await db.close();}
+});
+test('local provider executes containment only for queued independent Admin approval and settles atomically',async()=>{
+ const db=new PGlite();
+ const client:SqlClient={async query<Row extends QueryResultRow>(sql:string,values?:unknown[]){if(values===undefined){await db.exec(sql);return {rows:[] as Row[]};}return db.query<Row>(sql,values);}};
+ try{
+  await applyMigrations(client);
+  const ids=[];for(const role of ['ANALYST','ADMIN'] as Role[]){const {rows:[u]}=await db.query<{id:string}>("INSERT INTO users(email,name,password_hash,role) VALUES ($1,'Test','unused',$2) RETURNING id",[`${role.toLowerCase()}@local.test`,role]);ids.push({id:u.id,role});}
+  const {rows:[incident]}=await db.query<{id:string}>("INSERT INTO alerts(title,rule_id,severity,evidence) VALUES ('Local','test','HIGH',$1) RETURNING id",[JSON.stringify({actor:'local-target'})]);
+  const requestId=await requestResponse(db,ids[0],{incidentId:incident.id,reason:'Review this actor and contain only in simulation.'});
+  const unapproved={id:(await import('node:crypto')).randomUUID(),incident_id:incident.id,response_id:requestId,kind:'CONTAIN_SIMULATED',status:'RUNNING',payload:{actor:'local-target',approved:true,requestedBy:ids[0].id,approvedBy:ids[1].id},result:null,attempts:1,lease_token:null,error_code:null,created_at:new Date(),finished_at:null} as const;
+  await assert.rejects(runLocal(unapproved,db),/APPROVAL_INVALID/);
+  await decideResponse(db,ids[1],{requestId,decision:'APPROVE',note:'Approve this simulated action independently.'});
+  const job=await claimAutomation(db);assert.ok(job);const result=await runLocal(job,db);
+  assert.equal(result.engine,'LOCAL');assert.equal(result.realWorldChanges,false);
+  await settleAutomation(db,job,{result},'local');
+  const {rows:[receipt]}=await db.query<{status:string;result:{engine:string;realWorldChanges:boolean}}>('SELECT status,result FROM response_requests WHERE id=$1',[requestId]);
+  assert.equal(receipt.status,'SUCCEEDED');assert.equal(receipt.result.engine,'LOCAL');assert.equal(receipt.result.realWorldChanges,false);
+  assert.equal((await db.query("SELECT * FROM audit_logs WHERE action='response.simulated' AND metadata->>'engine'='LOCAL'")).rows.length,1);
  }finally{await db.close();}
 });

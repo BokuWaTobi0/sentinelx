@@ -4,9 +4,11 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { requestResponse,decideResponse,ResponseError } from '@/lib/response';
+import { automationProvider } from '@/lib/automation-provider';
 export type ResponseState={error?:string;success?:string};
 export async function responseAction(_previous:ResponseState,form:FormData):Promise<ResponseState>{
  const user=await requireUser();
+ const provider=automationProvider();
  let client;
  try{
   client=await db.connect();
@@ -16,7 +18,7 @@ export async function responseAction(_previous:ResponseState,form:FormData):Prom
   else if(input.operation==='decide')incidentId=await decideResponse(client,user,input);
   else return {error:'Unknown response operation.'};
   revalidatePath(`/incidents/${incidentId}`);revalidatePath('/admin');
-  return {success:input.operation==='request'?'Request submitted for independent Admin review.':input.decision==='APPROVE'?'Approved. Simulated containment queued for Windmill; completion will appear after the worker finishes.':'Request rejected.'};
+  return {success:input.operation==='request'?'Request submitted for independent Admin review.':input.decision==='APPROVE'?`Approved. Simulated containment queued for ${provider==='local'?'Local automation':'Windmill'}; completion will appear after the worker finishes.`:'Request rejected.'};
  }catch(error){
   if(error instanceof ResponseError)return {error:error.message};
   if(error instanceof z.ZodError)return {error:'Provide valid identifiers and a reason or decision note between 10 and 1,000 characters.'};

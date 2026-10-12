@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { SqlClient } from './sql-client';
 export type AutomationJob={id:string;incident_id:string;response_id:string|null;kind:'INVESTIGATE'|'CONTAIN_SIMULATED';status:'QUEUED'|'RUNNING'|'SUCCEEDED'|'FAILED';payload:Record<string,unknown>;result:Record<string,unknown>|null;attempts:number;lease_token:string|null;error_code:string|null;created_at:Date;finished_at:Date|null};
-const resultBase={jobId:z.string().uuid(),incidentId:z.string().uuid(),engine:z.literal('WINDMILL'),realWorldChanges:z.literal(false),windmillRunId:z.string().uuid().optional()};
+const resultBase={jobId:z.string().uuid(),incidentId:z.string().uuid(),engine:z.enum(['LOCAL','WINDMILL']),realWorldChanges:z.literal(false),windmillRunId:z.string().uuid().optional()};
 export const automationResult=z.discriminatedUnion('kind',[
  z.object({...resultBase,kind:z.literal('INVESTIGATE'),summary:z.string().min(1).max(2000),recommendation:z.string().min(1).max(2000),failureCount:z.number().int().nonnegative(),sourceIpCount:z.number().int().nonnegative()}),
  z.object({...resultBase,kind:z.literal('CONTAIN_SIMULATED'),responseId:z.string().uuid(),actor:z.string().min(1).max(500),action:z.literal('CONTAIN_ACTOR'),mode:z.literal('SIMULATION'),message:z.string().min(1).max(2000)})
@@ -25,15 +25,16 @@ export async function claimAutomation(client:SqlClient):Promise<AutomationJob|nu
   await client.query('COMMIT');return job??null;
  }catch(error){await client.query('ROLLBACK');throw error;}
 }
-export function validateAutomationResult(job:AutomationJob,input:unknown){
+export function validateAutomationResult(job:AutomationJob,input:unknown,provider:'local'|'windmill'='windmill'){
  const parsed=automationResult.parse(input);
+ if(parsed.engine!==(provider==='local'?'LOCAL':'WINDMILL'))throw new Error('RESULT_PROVIDER_MISMATCH');
  if(parsed.jobId!==job.id||parsed.incidentId!==job.incident_id||parsed.kind!==job.kind)throw new Error('RESULT_MISMATCH');
  if(parsed.kind==='CONTAIN_SIMULATED'&&(parsed.responseId!==job.response_id||parsed.actor!==job.payload.actor))throw new Error('RESULT_MISMATCH');
  return parsed;
 }
-export async function settleAutomation(client:SqlClient,claimed:AutomationJob,outcome:{result:unknown}|{errorCode:string;retryable:boolean}){
+export async function settleAutomation(client:SqlClient,claimed:AutomationJob,outcome:{result:unknown}|{errorCode:string;retryable:boolean},provider:'local'|'windmill'='windmill'){
  // Validate before opening the transaction; never persist arbitrary remote output.
- const result='result' in outcome?validateAutomationResult(claimed,outcome.result):null;
+ const result='result' in outcome?validateAutomationResult(claimed,outcome.result,provider):null;
  await client.query('BEGIN');
  try{
   const {rows:[job]}=await client.query<AutomationJob>("SELECT * FROM automation_jobs WHERE id=$1 AND status='RUNNING' AND lease_token=$2 FOR UPDATE",[claimed.id,claimed.lease_token]);

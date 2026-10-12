@@ -11,6 +11,7 @@ import { applyMigrations } from '../src/lib/migrations';
 import { ingestEvents } from '../src/lib/ingest-events';
 import { claimAutomation,settleAutomation,retryAutomation,validateAutomationResult,type AutomationJob } from '../src/lib/automation';
 import { windmillConfig,runWindmill,WindmillError } from '../src/lib/windmill';
+import { automationProvider,runLocal } from '../src/lib/automation-provider';
 function report(job:AutomationJob){return {jobId:job.id,incidentId:job.incident_id,kind:'INVESTIGATE',engine:'WINDMILL',realWorldChanges:false,summary:'Evidence snapshot reviewed.',recommendation:'Verify events before containment.',failureCount:8,sourceIpCount:1};}
 test('durable auto-queue, retry leases, stale workers, terminal failures and atomic audit',async()=>{
  const db=new PGlite();
@@ -56,6 +57,19 @@ test('Windmill configuration requires a sync flow endpoint and keeps secrets out
  assert.throws(()=>windmillConfig({}),/NOT_CONFIGURED/);
  for(const url of ['http://example.com/api/w/demo/jobs/run_wait_result/f/f/test','https://example.com/api/w/demo/jobs/run/f/f/test','https://example.com/api/w/demo/jobs/run_wait_result/f/f/test?token=secret','https://user:secret@example.com/api/w/demo/jobs/run_wait_result/f/f/test'])assert.throws(()=>windmillConfig({WINDMILL_WEBHOOK_URL:url,WINDMILL_TOKEN:'token'}),/INVALID_WEBHOOK_URL/);
  assert.equal(windmillConfig({WINDMILL_WEBHOOK_URL:'https://app.windmill.dev/api/w/demo/jobs/run_wait_result/f/f/sentinelx/incident',WINDMILL_TOKEN:'token'}).token,'token');
+});
+test('provider selection defaults to local, rejects unknown values, and local execution uses only the queued snapshot',async()=>{
+ assert.equal(automationProvider({}), 'local');assert.equal(automationProvider({AUTOMATION_PROVIDER:'windmill'}),'windmill');
+ assert.throws(()=>automationProvider({AUTOMATION_PROVIDER:'other'}),/INVALID_AUTOMATION_PROVIDER/);
+ const job={id:randomUUID(),incident_id:randomUUID(),response_id:null,kind:'INVESTIGATE',status:'RUNNING',payload:{actor:'snapshot-actor',failureCount:8,sourceIps:['192.0.2.4']},result:null,attempts:1,lease_token:randomUUID(),error_code:null,created_at:new Date(),finished_at:null} satisfies AutomationJob;
+ const result=await runLocal(job);assert.equal(result.engine,'LOCAL');assert.equal(result.kind,'INVESTIGATE');if(result.kind!=='INVESTIGATE')throw new Error('Expected local investigation result');assert.match(result.summary,/snapshot-actor/);assert.equal(result.failureCount,8);assert.equal(result.sourceIpCount,1);
+ assert.throws(()=>validateAutomationResult(job,{...result,engine:'WINDMILL'},'local'),/RESULT_PROVIDER_MISMATCH/);
+});
+test('local simulated containment requires an independent approval and honestly records LOCAL',async()=>{
+ const job={id:randomUUID(),incident_id:randomUUID(),response_id:randomUUID(),kind:'CONTAIN_SIMULATED',status:'RUNNING',payload:{actor:'approved-actor',approved:true,requestedBy:randomUUID(),approvedBy:randomUUID()},result:null,attempts:1,lease_token:randomUUID(),error_code:null,created_at:new Date(),finished_at:null} satisfies AutomationJob;
+ await assert.rejects(runLocal(job),/APPROVAL_INVALID/);
+ await assert.rejects(runLocal({...job,payload:{...job.payload,approvedBy:job.payload.requestedBy}}),/APPROVAL_INVALID/);
+ await assert.rejects(runLocal({...job,payload:{...job.payload,approved:false}}),/APPROVAL_INVALID/);
 });
 test('real HTTP adapter authenticates, bounds responses and rejects Windmill errors or mismatched results',async()=>{
  const job={id:randomUUID(),incident_id:randomUUID(),kind:'INVESTIGATE',payload:{actor:'demo'},response_id:null,status:'RUNNING',result:null,attempts:1,lease_token:randomUUID(),error_code:null,created_at:new Date(),finished_at:null} satisfies AutomationJob;

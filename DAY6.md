@@ -1,7 +1,9 @@
-# SentinelX Day 6 — Windmill automation
+# SentinelX Day 6 — optional Windmill automation
+
+Local automation is the default and needs no external service. Follow DEMO.md to complete the demo without Windmill. Use this guide only when you explicitly want the Windmill provider: set `AUTOMATION_PROVIDER=windmill` in `.env` before starting the app and worker. The Windmill integration remains optional; local mode records `LOCAL` receipts and never makes a Windmill request.
 
 ## What visibly changes
-Open any incident: a new Windmill automation panel shows durable job status, attempts, errors and returned results. Newly detected incidents automatically queue an investigation report. Approving containment now means APPROVED / AWAITING WINDMILL; only a validated workflow result marks it SIMULATION COMPLETED. Existing Day 5 completed receipts are preserved.
+Open any incident: the selected provider's automation panel shows durable job status, attempts, errors and returned results. Newly detected incidents automatically queue an investigation report. Approval and completed simulation are separate states. Existing Day 5 completed receipts are preserved.
 
 ## First: install
 Stop the dev server, extract the update to a separate folder, and follow START-HERE.md. Apply migration 004 before starting the app or simulator. No new npm dependency is needed.

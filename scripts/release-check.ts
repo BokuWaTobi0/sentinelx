@@ -16,4 +16,4 @@ try{
 finally{await pool?.end();}
 for(const check of checks)console.log(`${check.passed?'PASS':'FAIL'} ${check.name}`);
 if(checks.some(check=>!check.passed)){console.log('Fix failed items using DAY7.md before the demo. No records were modified.');process.exitCode=1;}
-else console.log('Local prerequisites verified. Run automation:check for the live Windmill connection, then the Day 7 browser checklist. No records were modified.');
+else console.log('Local prerequisites verified for the selected automation provider. Run automation:check, then the Day 7 browser checklist. No records were modified.');
