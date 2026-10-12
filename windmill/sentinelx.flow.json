@@ -1,0 +1,50 @@
+{
+  "summary": "SentinelX incident investigation and approved simulated containment",
+  "description": "Two-step workflow: validate immutable incident/approval inputs, then produce a deterministic investigation report or simulation receipt. No external side effects. Approval is enforced in SentinelX before dispatch.",
+  "schema": {
+    "type": "object",
+    "required": [
+      "payload"
+    ],
+    "properties": {
+      "payload": {
+        "type": "object",
+        "description": "Immutable queued SentinelX payload"
+      }
+    }
+  },
+  "value": {
+    "modules": [
+      {
+        "id": "validate",
+        "summary": "Validate snapshot and independent approval",
+        "value": {
+          "type": "rawscript",
+          "language": "python3",
+          "content": "from uuid import UUID\n\n\ndef main(payload: dict):\n    if not isinstance(payload, dict):\n        raise ValueError(\"payload must be an object\")\n    for key in (\"jobId\", \"incidentId\"):\n        UUID(payload[key])\n    kind = payload.get(\"kind\")\n    if kind not in (\"INVESTIGATE\", \"CONTAIN_SIMULATED\"):\n        raise ValueError(\"unsupported workflow kind\")\n    actor = payload.get(\"actor\")\n    if not isinstance(actor, str) or not actor.strip() or len(actor) > 500:\n        raise ValueError(\"invalid evidence actor\")\n    if kind == \"CONTAIN_SIMULATED\":\n        UUID(payload[\"responseId\"])\n        UUID(payload[\"requestedBy\"])\n        UUID(payload[\"approvedBy\"])\n        if payload.get(\"approved\") is not True or payload[\"requestedBy\"] == payload[\"approvedBy\"]:\n            raise ValueError(\"independent approval required\")\n    else:\n        count = payload.get(\"failureCount\")\n        if type(count) is not int or count < 0:\n            raise ValueError(\"invalid failure count\")\n        ips = payload.get(\"sourceIps\")\n        if not isinstance(ips, list) or any(not isinstance(ip, str) for ip in ips):\n            raise ValueError(\"invalid source IP snapshot\")\n    return payload\n",
+          "input_transforms": {
+            "payload": {
+              "type": "javascript",
+              "expr": "flow_input.payload"
+            }
+          }
+        }
+      },
+      {
+        "id": "execute",
+        "summary": "Investigate or simulate approved containment",
+        "value": {
+          "type": "rawscript",
+          "language": "python3",
+          "content": "import os\n\n\ndef main(payload: dict):\n    # This step receives the validated output of the preceding step.\n    result = {\n        \"jobId\": payload[\"jobId\"],\n        \"incidentId\": payload[\"incidentId\"],\n        \"kind\": payload[\"kind\"],\n        \"engine\": \"WINDMILL\",\n        \"realWorldChanges\": False,\n    }\n    run_id = os.environ.get(\"WM_ROOT_FLOW_JOB_ID\") or os.environ.get(\"WM_JOB_ID\")\n    if run_id:\n        result[\"windmillRunId\"] = run_id\n    if payload[\"kind\"] == \"INVESTIGATE\":\n        count = payload[\"failureCount\"]\n        ips = len(set(payload[\"sourceIps\"]))\n        result.update({\n            \"failureCount\": count,\n            \"sourceIpCount\": ips,\n            \"summary\": f\"Snapshot review: {count} failed logins for {payload['actor']} across {ips} source IPs in {payload.get('windowSeconds', 60)} seconds.\",\n            \"recommendation\": \"Review the exact event timeline and verify the actor's activity before requesting containment. This is a rule-based snapshot review, not external threat intelligence.\",\n        })\n        if payload.get(\"evidenceTruncated\"):\n            result[\"recommendation\"] += \" The event evidence snapshot was truncated.\"\n    else:\n        result.update({\n            \"responseId\": payload[\"responseId\"],\n            \"actor\": payload[\"actor\"],\n            \"action\": \"CONTAIN_ACTOR\",\n            \"mode\": \"SIMULATION\",\n            \"message\": \"Windmill completed simulated containment. No real account, network or device was changed.\",\n        })\n    return result\n",
+          "input_transforms": {
+            "payload": {
+              "type": "javascript",
+              "expr": "results.validate"
+            }
+          }
+        }
+      }
+    ]
+  }
+}
