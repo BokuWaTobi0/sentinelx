@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {parseAlertFilters,searchRecord,alertFilterValues,alertSearchSql,evidenceIds,evidenceEventsSql,relatedAlertsSql,eventSearchSql,timeSeconds,parseRelatedTimelineFilters,relatedTimelineSql,relatedTimelineValues,RELATED_TIMELINE_PAGE_SIZE} from '../src/lib/investigation';
 import {parseFilters} from '../src/lib/event-schema';
-async function database(run:(db:PGlite)=>Promise<void>){const db=new PGlite();try{await db.exec(await readFile('db/migrations/001_init.sql','utf8'));await run(db);}finally{await db.close();}}
+async function database(run:(db:PGlite)=>Promise<void>){const db=new PGlite();try{await db.exec(await readFile('db/migrations/001_init.sql','utf8'));await db.exec(await readFile('db/migrations/007_day10_risk_live.sql','utf8'));await run(db);}finally{await db.close();}}
 test('filter validation rejects invalid enums, repeated keys and oversize fields',()=>{
  assert.equal(parseAlertFilters({}).success,true);
  assert.equal(parseAlertFilters({status:'BAD'}).success,false);
@@ -21,9 +21,15 @@ test('filter validation rejects invalid enums, repeated keys and oversize fields
 test('server filters can find an incident outside the latest 100 and return full matching count',async()=>database(async db=>{
  await db.query(`INSERT INTO alerts(title,rule_id,severity,status,evidence,created_at) SELECT 'Recent '||n,'rule','LOW','OPEN','{}',now() FROM generate_series(1,105) n`);
  await db.query(`INSERT INTO alerts(title,rule_id,severity,status,evidence,created_at) VALUES ('Old target','rule','HIGH','ACKNOWLEDGED','{"actor":"target"}',now()-interval '2 days')`);
- const all=await db.query<{total_matches:number}>(alertSearchSql,alertFilterValues({time:'all'}));assert.equal(all.rows.length,100);assert.equal(all.rows[0].total_matches,106);
+ const all=await db.query<{total_matches:number}>(alertSearchSql,alertFilterValues({time:'all'}));assert.equal(all.rows.length,25);assert.equal(all.rows[0].total_matches,106);
  const match=await db.query<{title:string}>(alertSearchSql,alertFilterValues({actor:'target',status:'ACKNOWLEDGED',severity:'HIGH',time:'7d'}));assert.equal(match.rows.length,1);assert.equal(match.rows[0].title,'Old target');
  assert.equal((await db.query(alertSearchSql,alertFilterValues({actor:'target',time:'24h'}))).rows.length,0);
+}));
+test('priority filters, score sorting and stable bounded pagination',async()=>database(async db=>{
+ for(let i=0;i<61;i++){const band=i%2?'HIGH':'LOW';await db.query(`INSERT INTO alerts(title,rule_id,severity,evidence,priority_score,priority_band) VALUES ($1,'rule','LOW','{}',$2,$3)`,[`rank-${i}`,i%2?80:10,band]);}
+ const first=await db.query<{title:string;total_matches:number}>(alertSearchSql,alertFilterValues({time:'all',priority:'HIGH',sort:'priority',page:1}));assert.equal(first.rows.length,25);assert.equal(first.rows[0].title,'rank-59');assert.equal(first.rows[0].total_matches,30);
+ const second=await db.query<{title:string}>(alertSearchSql,alertFilterValues({time:'all',priority:'HIGH',sort:'priority',page:2}));assert.equal(second.rows.length,5);assert.equal(new Set([...first.rows,...second.rows].map(r=>r.title)).size,30);
+ assert.equal(parseAlertFilters({priority:'UNKNOWN'}).success,false);assert.equal(parseAlertFilters({page:'201'}).success,false);
 }));
 test('incident text search treats input literally, including wildcard and SQL-looking text',async()=>database(async db=>{
  await db.query(`INSERT INTO alerts(title,rule_id,severity,evidence) VALUES ('Percent 100%','rule','HIGH','{"actor":"a"}'),('Ordinary','rule','LOW','{}')`);

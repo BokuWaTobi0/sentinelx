@@ -5,7 +5,8 @@ test('readiness requires every migration and validates prerequisites without exp
  assert.equal(migrationReady(['001_init','002_detection','003_response']),false);
  assert.equal(migrationReady(['001_init','002_detection','003_response','004_automation']),false);
  assert.equal(migrationReady(['001_init','002_detection','003_response','004_automation','005_day8_detection_timeline']),false);
- assert.equal(migrationReady(['001_init','002_detection','003_response','004_automation','005_day8_detection_timeline','006_day9_collaboration']),true);
+ assert.equal(migrationReady(['001_init','002_detection','003_response','004_automation','005_day8_detection_timeline','006_day9_collaboration']),false);
+ assert.equal(migrationReady(['001_init','002_detection','003_response','004_automation','005_day8_detection_timeline','006_day9_collaboration','007_day10_risk_live']),true);
  const empty=configurationChecks({});assert.ok(empty.some(check=>check.name==='Database URL configured'&&!check.passed));assert.ok(empty.some(check=>check.name==='Ingestion key configured'&&!check.passed));assert.ok(empty.some(check=>check.name==='Local automation settings valid'&&check.passed));
  const local=configurationChecks({DATABASE_URL:'postgresql://db',INGEST_API_KEY:'a'.repeat(64)});assert.ok(local.every(check=>check.passed));
  assert.ok(configurationChecks({DATABASE_URL:'postgresql://db',INGEST_API_KEY:'a'.repeat(64),AUTOMATION_PROVIDER:'unsupported'}).some(check=>!check.passed));

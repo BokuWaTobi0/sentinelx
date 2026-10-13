@@ -48,10 +48,11 @@ test('an eight-event burst creates one explained HIGH alert and retry is idempot
  const events=burst();
  const result=await ingestEvents(db,events);
  assert.equal(result.accepted,8);assert.equal(result.alertsCreated,1);
- const {rows:[alert]}=await db.query<{severity:string;status:string;rule_id:string;evidence:Record<string,unknown>}>('SELECT severity,status,rule_id,evidence FROM alerts');
+ const {rows:[alert]}=await db.query<{severity:string;status:string;rule_id:string;evidence:Record<string,unknown>;priority_score:number;priority_band:string;scoring_version:string;score_factors:{key:string;points:number}[]}>('SELECT severity,status,rule_id,evidence,priority_score,priority_band,scoring_version,score_factors FROM alerts');
  assert.equal(alert.severity,'HIGH');assert.equal(alert.status,'OPEN');assert.equal(alert.rule_id,LOGIN_BURST_RULE);
  assert.equal(alert.evidence.failureCount,8);assert.equal(alert.evidence.threshold,5);assert.equal(alert.evidence.windowSeconds,60);
  assert.equal((alert.evidence.eventIds as string[]).length,8);assert.equal(alert.evidence.demo,true);
+ assert.equal(alert.priority_score,20);assert.equal(alert.priority_band,'LOW');assert.equal(alert.scoring_version,'priority-v1');assert.ok(alert.score_factors.length>=3);
  const retry=await ingestEvents(db,events);
  assert.equal(retry.accepted,0);assert.equal(retry.duplicates,8);assert.equal(retry.alertsCreated,0);
  assert.equal((await db.query("SELECT * FROM audit_logs WHERE action='alert.detected'")).rows.length,1);
@@ -115,7 +116,7 @@ test('migration upgrades Day 1 without changing users and is safe to rerun',asyn
   await db.exec("CREATE TABLE schema_migrations(version text PRIMARY KEY,applied_at timestamptz DEFAULT now()); INSERT INTO schema_migrations(version) VALUES ('001_init');");
   await db.query("INSERT INTO users(email,name,password_hash,role) VALUES ('test@example.com','Test','preserve-this-hash','ADMIN')");
   await applyMigrations(migrationClient(db));await applyMigrations(migrationClient(db));
-  assert.equal((await db.query('SELECT * FROM schema_migrations')).rows.length,6);
+  assert.equal((await db.query('SELECT * FROM schema_migrations')).rows.length,7);
   const {rows:[user]}=await db.query<{password_hash:string}>('SELECT password_hash FROM users');
   assert.equal(user.password_hash,'preserve-this-hash');
   assert.equal((await db.query('SELECT * FROM detection_windows')).rows.length,0);

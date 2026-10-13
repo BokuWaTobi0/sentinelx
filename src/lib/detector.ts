@@ -1,5 +1,6 @@
 import type { SqlClient } from './sql-client';
 import { enqueueAutomation } from './automation';
+import { scoreIncident } from './risk-score';
 
 export const LOGIN_BURST_RULE='failed-login-burst-v1';
 export const PASSWORD_SPRAY_RULE='password-spray-v1';
@@ -125,8 +126,9 @@ async function isSuppressed(client:SqlClient,ruleId:string,groupKey:string,end:s
 
 async function recordIncident(client:SqlClient,input:{ruleId:string;groupKey:string;anchorId:string;title:string;severity:'HIGH';evidence:Record<string,unknown>;actor?:string|null;windowEnd:string}){
  if(await isSuppressed(client,input.ruleId,input.groupKey,input.windowEnd))return null;
- const {rows:[created]}=await client.query<{id:string}>(`INSERT INTO alerts(event_id,title,rule_id,severity,evidence)
-  VALUES ($1,$2,$3,$4,$5) RETURNING id`,[input.anchorId,input.title,input.ruleId,input.severity,JSON.stringify(input.evidence)]);
+ const score=scoreIncident(input.evidence);
+ const {rows:[created]}=await client.query<{id:string}>(`INSERT INTO alerts(event_id,title,rule_id,severity,evidence,priority_score,priority_band,scoring_version,score_factors,scored_at)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,CASE WHEN $6::int IS NULL THEN NULL ELSE now() END) RETURNING id`,[input.anchorId,input.title,input.ruleId,input.severity,JSON.stringify(input.evidence),score?.score??null,score?.band??null,score?.version??null,score?JSON.stringify(score.factors):null]);
  await client.query('INSERT INTO detection_cooldowns(rule_id,group_key,window_end,alert_id) VALUES ($1,$2,$3,$4)',[input.ruleId,input.groupKey,input.windowEnd,created.id]);
  if(input.ruleId===LOGIN_BURST_RULE&&input.actor)await client.query('INSERT INTO detection_windows(rule_id,actor,window_end,alert_id) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING',[input.ruleId,input.actor,input.windowEnd,created.id]);
  await client.query("INSERT INTO audit_logs(action,target_id,metadata) VALUES ('alert.detected',$1,$2)",[created.id,JSON.stringify({ruleId:input.ruleId,groupKey:input.groupKey,...input.evidence})]);

@@ -11,6 +11,8 @@ SentinelX receives simulated security events, detects suspicious authentication 
 - Analyst response requests and independent Admin approval/rejection.
 - Durable automation queue, immutable-snapshot investigation, approved simulated containment, bounded retries and worker leases.
 - Incident response history and Admin-only audit history.
+- Versioned incident priority scores with stored point-by-point explanations from immutable detector evidence; score is separate from status and never authorizes response.
+- Authenticated live incident/dashboard updates using bounded polling, visibility pausing, backoff, and a new-incident indicator.
 
 Containment does not disable real accounts or block IPs. Investigation summarizes the detection snapshot; it is not external threat intelligence or AI. This is a single-organization portfolio demo, not an enterprise security deployment.
 
@@ -62,7 +64,7 @@ npm.cmd run automation:check
 ## Day 9 collaboration and architecture
 The incident page separates “What happened”, immutable “Evidence”, and “Next action”, then shows later related events and a separate collaboration history. Analysts and Admins can assign one active Analyst, append plain-text notes, and update incident status; only Admins can approve or reject simulated response. Assignment writes and audit rows commit atomically, stale assignment forms are rejected, and Viewer accounts remain read-only. The collaboration history uses an allowlisted table, separate from the Admin-only audit trail.
 
-Use **Explore SentinelX** for a manually controlled architecture model. Its static architecture map remains available for keyboard and mobile users; 3D transforms fall back to the static map where unavailable. The model explains that investigation is automatic while containment needs independent Admin approval. DAY9.md has exact migration/start commands and role-based acceptance steps.
+Use **Explore SentinelX** for a manually controlled architecture model. Its static architecture map remains available for keyboard and mobile users; 3D transforms fall back to the static map where unavailable. The model explains that investigation is automatic while containment needs independent Admin approval. DAY9.md has collaboration acceptance steps; DAY10.md documents priority scoring, live update behavior, migration/backfill commands and role-based checks.
 
 ## Recovery
 - Database unavailable: start Docker Desktop, run `docker compose up -d --wait`, inspect `docker compose ps`, and confirm `DATABASE_URL`.
