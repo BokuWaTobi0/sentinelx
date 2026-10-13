@@ -24,12 +24,14 @@ test('response permissions, independent review, atomic receipts, duplicate preve
   // Fresh database role wins over a spoofed or stale application role.
   await assert.rejects(requestResponse(db,{...viewer,role:'ADMIN'},requestInput),/Only Analysts/);
   const id=await requestResponse(db,analyst,requestInput);
+  assert.equal((await db.query<{action:string}>("SELECT action FROM incident_history WHERE incident_id=$1 ORDER BY created_at,id LIMIT 1",[incident.id])).rows[0].action,'RESPONSE_REQUESTED');
   await assert.rejects(requestResponse(db,analyst,requestInput),/already awaiting/);
   const decision={requestId:id,decision:'APPROVE',note:'Evidence reviewed; run the simulated containment.'};
   await assert.rejects(decideResponse(db,analyst,decision),/Only Admins/);
   await assert.rejects(decideResponse(db,viewer,decision),/Only Admins/);
   await db.query("UPDATE alerts SET evidence=$1 WHERE id=$2",[JSON.stringify({actor:'changed-after-request'}),incident.id]);
   await decideResponse(db,admin,decision);
+  assert.equal((await db.query<{action:string}>("SELECT action FROM incident_history WHERE incident_id=$1 AND action='RESPONSE_APPROVED'",[incident.id])).rows.length,1);
   assert.equal((await db.query<{status:string}>('SELECT status FROM response_requests WHERE id=$1',[id])).rows[0].status,'APPROVED');
   await assert.rejects(requestResponse(db,analyst,requestInput),/already awaiting/);
   const job=await claimAutomation(db);assert.ok(job);

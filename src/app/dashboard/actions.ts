@@ -11,7 +11,9 @@ export async function updateAlert(form:FormData) {
   await client.query('BEGIN');
   const old = await client.query('SELECT status FROM alerts WHERE id=$1 FOR UPDATE',[id]);
   if(!old.rowCount) throw new Error('Alert not found');
+  if(old.rows[0].status===status){await client.query('COMMIT');return;}
   await client.query('UPDATE alerts SET status=$1,updated_at=now() WHERE id=$2',[status,id]);
+  await client.query("INSERT INTO incident_history(incident_id,actor_id,action,details) VALUES ($1,$2,'STATUS_CHANGED',$3)",[id,user.id,JSON.stringify({from:old.rows[0].status,to:status})]);
   await client.query("INSERT INTO audit_logs(user_id,action,target_id,metadata) VALUES ($1,'alert.status_changed',$2,$3)",[user.id,id,JSON.stringify({from:old.rows[0].status,to:status})]);
   await client.query('COMMIT');
  } catch(error) { await client.query('ROLLBACK'); throw error; }

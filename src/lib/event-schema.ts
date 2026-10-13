@@ -12,7 +12,7 @@ export const eventSchema = z.object({
   hostname: z.string().max(128).optional(),
   reason: z.string().max(256).optional(),
   demo: z.boolean().optional(),
-  scenario: z.enum(['normal','login-burst']).optional(),
+  scenario: z.enum(['normal','login-burst','password-spray','ip-failures','success-after-burst']).optional(),
  }).strict().default({}),
 }).strict();
 export const batchSchema = z.object({events:z.array(eventSchema).min(1).max(100)}).strict();

@@ -1,11 +1,12 @@
 # SentinelX — Security operations portfolio MVP
 
-SentinelX receives simulated security events, detects repeated login failures, explains supporting evidence, and routes independently approved simulated containment through local automation by default or Windmill when selected.
+SentinelX receives simulated security events, detects suspicious authentication patterns, explains immutable triggering evidence alongside later event context, and routes independently approved simulated containment through local automation by default or Windmill when selected.
 
 ## Implemented capabilities
 - Database-backed login, revocable sessions, Viewer/Analyst/Admin permissions.
 - Authenticated, validated event ingestion with event-ID deduplication.
-- Rule: at least five failed logins for an actor within an inclusive 60-second window. Evidence snapshots and overlapping-window suppression.
+- Four deterministic rules: actor login burst, IP password spraying, repeated IP failures across actor labels, and a successful login after a burst. Rules store immutable evidence, use event time, and apply rule-specific cooldowns. Actor labels are not verified account identities; IP-centered findings do not invent an actor.
+- Incident investigation separates immutable triggering evidence from filtered, paginated related events fetched later.
 - Incident queue, filters, exact evidence timeline, event details and incident links.
 - Analyst response requests and independent Admin approval/rejection.
 - Durable automation queue, immutable-snapshot investigation, approved simulated containment, bounded retries and worker leases.
@@ -56,7 +57,12 @@ npm.cmd run release:check
 npm.cmd run automation:check
 ```
 
-`release:check` validates the selected provider, environment format, database/schema and active role availability. `automation:check` validates the selected provider without modifying SentinelX records. DEMO.md provides local-demo steps; DAY6.md documents the optional Windmill setup.
+`release:check` validates the selected provider, environment format, database/schema and active role availability. `automation:check` validates the selected provider without modifying SentinelX records. DEMO.md provides local-demo steps; DAY6.md documents optional Windmill setup; DAY8.md documents detection thresholds and investigation timeline; DAY9.md documents collaboration, the redesigned interface, and the architecture explorer.
+
+## Day 9 collaboration and architecture
+The incident page separates “What happened”, immutable “Evidence”, and “Next action”, then shows later related events and a separate collaboration history. Analysts and Admins can assign one active Analyst, append plain-text notes, and update incident status; only Admins can approve or reject simulated response. Assignment writes and audit rows commit atomically, stale assignment forms are rejected, and Viewer accounts remain read-only. The collaboration history uses an allowlisted table, separate from the Admin-only audit trail.
+
+Use **Explore SentinelX** for a manually controlled architecture model. Its static architecture map remains available for keyboard and mobile users; 3D transforms fall back to the static map where unavailable. The model explains that investigation is automatic while containment needs independent Admin approval. DAY9.md has exact migration/start commands and role-based acceptance steps.
 
 ## Recovery
 - Database unavailable: start Docker Desktop, run `docker compose up -d --wait`, inspect `docker compose ps`, and confirm `DATABASE_URL`.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {parseAlertFilters,searchRecord,alertFilterValues,alertSearchSql,evidenceIds,evidenceEventsSql,relatedAlertsSql,eventSearchSql,timeSeconds} from '../src/lib/investigation';
+import {parseAlertFilters,searchRecord,alertFilterValues,alertSearchSql,evidenceIds,evidenceEventsSql,relatedAlertsSql,eventSearchSql,timeSeconds,parseRelatedTimelineFilters,relatedTimelineSql,relatedTimelineValues,RELATED_TIMELINE_PAGE_SIZE} from '../src/lib/investigation';
 import {parseFilters} from '../src/lib/event-schema';
 async function database(run:(db:PGlite)=>Promise<void>){const db=new PGlite();try{await db.exec(await readFile('db/migrations/001_init.sql','utf8'));await run(db);}finally{await db.close();}}
 test('filter validation rejects invalid enums, repeated keys and oversize fields',()=>{
@@ -50,4 +50,31 @@ test('telemetry time filters use occurrence time rather than ingestion time',asy
  assert.equal((await db.query(eventSearchSql,['target',null,86400])).rows.length,1);
  assert.equal((await db.query(eventSearchSql,['target',null,604800])).rows.length,2);
  assert.equal((await db.query(eventSearchSql,['target','LOGIN_FAILURE',86400])).rows.length,0);
+}));
+test('related timeline filters validate actor, IP, time range, paired cursor and bounded pages',()=>{
+ assert.equal(parseRelatedTimelineFilters(new URLSearchParams('actor=alice&sourceIp=192.0.2.5&time=24h')).success,true);
+ assert.equal(parseRelatedTimelineFilters(new URLSearchParams('sourceIp=invalid')).success,false);
+ assert.equal(parseRelatedTimelineFilters(new URLSearchParams('time=forever')).success,false);
+ assert.equal(parseRelatedTimelineFilters(new URLSearchParams('page=201')).success,false);
+ assert.equal(parseRelatedTimelineFilters(new URLSearchParams('actor=a&actor=b')).success,false);
+ assert.equal(parseRelatedTimelineFilters(new URLSearchParams('afterId='+randomUUID())).success,false);
+});
+test('related event query filters actor/IP/time and uses bounded stable keyset pages excluding snapshot evidence',async()=>database(async db=>{
+ const evidenceIds:string[]=[];
+ for(let i=0;i<123;i++){
+  const id=randomUUID();if(i===10||i===80)evidenceIds.push(id);
+  const age=i===122?'2 days':`${i} seconds`;
+  await db.query(`INSERT INTO events(id,occurred_at,source,event_type,actor,source_ip) VALUES ($1,now()-$2::interval,'test',$3,$4,$5::inet)`,[id,age,i%2?'LOGIN_SUCCESS':'LOGIN_FAILURE',i%2?'alice':'bob',i%3?'192.0.2.20':'192.0.2.21']);
+ }
+ const filters=parseRelatedTimelineFilters(new URLSearchParams('time=all&page=1'));assert.equal(filters.success,true);if(!filters.success)return;
+ const first=(await db.query<{id:string;occurred_at:Date}>(relatedTimelineSql,relatedTimelineValues(evidenceIds,filters.data))).rows;
+ assert.equal(first.length,RELATED_TIMELINE_PAGE_SIZE+1);
+ const page1=first.slice(0,RELATED_TIMELINE_PAGE_SIZE);assert.equal(page1.some(row=>evidenceIds.includes(row.id)),false);
+ const last=page1.at(-1)!;const nextFilters={...filters.data,page:2,afterOccurredAt:new Date(last.occurred_at).toISOString(),afterId:last.id};
+ const second=(await db.query<{id:string;occurred_at:Date}>(relatedTimelineSql,relatedTimelineValues(evidenceIds,nextFilters))).rows;
+ assert.equal(second.length,RELATED_TIMELINE_PAGE_SIZE+1);const page2=second.slice(0,RELATED_TIMELINE_PAGE_SIZE);assert.ok(new Date(page2[0].occurred_at)>=new Date(last.occurred_at));
+ assert.equal(new Set([...page1,...page2].map(row=>row.id)).size,page1.length+page2.length);
+ const matching=parseRelatedTimelineFilters(new URLSearchParams('actor=alice&sourceIp=192.0.2.20&time=24h&page=1'));assert.equal(matching.success,true);if(!matching.success)return;
+ const matched=await db.query<{actor:string;source_ip:string;occurred_at:Date}>(relatedTimelineSql,relatedTimelineValues(evidenceIds,matching.data));
+ assert.ok(matched.rows.length>0);assert.ok(matched.rows.every(row=>row.actor==='alice'&&row.source_ip==='192.0.2.20'&&Date.now()-new Date(row.occurred_at).getTime()<86400000));
 }));

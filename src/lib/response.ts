@@ -27,6 +27,7 @@ export async function requestResponse(client:SqlClient,identity:Identity,input:u
   const {rows:[request]}=await client.query<{id:string}>(`INSERT INTO response_requests(incident_id,requested_by,target_actor,reason) VALUES ($1,$2,$3,$4) ON CONFLICT (incident_id) WHERE status IN ('PENDING','APPROVED') DO NOTHING RETURNING id`,[data.incidentId,identity.id,actor,data.reason]);
   if(!request)throw new ResponseError('A response request is already awaiting approval or workflow completion for this incident.');
   await client.query("INSERT INTO audit_logs(user_id,action,target_id,metadata) VALUES ($1,'response.requested',$2,$3)",[identity.id,data.incidentId,JSON.stringify({requestId:request.id,actor,reason:data.reason,mode:'SIMULATION'})]);
+  await client.query("INSERT INTO incident_history(incident_id,actor_id,action) VALUES ($1,$2,'RESPONSE_REQUESTED')",[data.incidentId,identity.id]);
   await client.query('COMMIT');return request.id;
  }catch(error){await client.query('ROLLBACK');throw error;}
 }
@@ -47,6 +48,7 @@ export async function decideResponse(client:SqlClient,identity:Identity,input:un
   const result=data.decision==='APPROVE'?{mode:'SIMULATION',action:'CONTAIN_ACTOR',actor:request.target_actor,realWorldChanges:false,message:'Simulated containment recorded. No account, network or device was changed.'}:null;
   await client.query('UPDATE response_requests SET status=$1,decided_by=$2,decision_note=$3,result=$4,decided_at=now() WHERE id=$5',[result?'APPROVED':'REJECTED',identity.id,data.note,null,request.id]);
   await client.query('INSERT INTO audit_logs(user_id,action,target_id,metadata) VALUES ($1,$2,$3,$4)',[identity.id,result?'response.approved':'response.rejected',request.incident_id,JSON.stringify({requestId:request.id,note:data.note,actor:request.target_actor,mode:'SIMULATION'})]);
+  await client.query("INSERT INTO incident_history(incident_id,actor_id,action) VALUES ($1,$2,$3)",[request.incident_id,identity.id,result?'RESPONSE_APPROVED':'RESPONSE_REJECTED']);
   if(result)await enqueueAutomation(client,request.incident_id,'CONTAIN_SIMULATED',{actor:request.target_actor,approved:true,requestedBy:request.requested_by,approvedBy:identity.id},request.id);
   await client.query('COMMIT');return request.incident_id;
  }catch(error){await client.query('ROLLBACK');throw error;}

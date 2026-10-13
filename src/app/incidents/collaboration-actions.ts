@@ -1,0 +1,8 @@
+'use server';
+import { revalidatePath } from 'next/cache';
+import { requirePermission } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { addIncidentNote,assignIncident,AssignmentConflictError,CollaborationError } from '@/lib/collaboration';
+export type CollaborationState={error?:string;success?:string};
+export async function assignIncidentAction(_state:CollaborationState,form:FormData):Promise<CollaborationState>{const user=await requirePermission('alerts:update');let client;try{client=await db.connect();const incident=await assignIncident(client,user,{incidentId:form.get('incidentId'),assigneeId:form.get('assigneeId'),expectedAssigneeId:form.get('expectedAssigneeId')});revalidatePath(`/incidents/${incident}`);revalidatePath('/dashboard');return {success:'Assignment updated.'};}catch(error){return {error:error instanceof AssignmentConflictError||error instanceof CollaborationError?error.message:'Unable to update the assignment. Try again.'};}finally{client?.release();}}
+export async function addIncidentNoteAction(_state:CollaborationState,form:FormData):Promise<CollaborationState>{const user=await requirePermission('alerts:update');let client;try{client=await db.connect();const incident=await addIncidentNote(client,user,{incidentId:form.get('incidentId'),note:form.get('note')});revalidatePath(`/incidents/${incident}`);return {success:'Note added to incident history.'};}catch(error){return {error:error instanceof CollaborationError?error.message:'Enter a note between 1 and 2,000 characters.'};}finally{client?.release();}}

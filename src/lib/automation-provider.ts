@@ -15,7 +15,8 @@ export async function runLocal(job:AutomationJob,client?:SqlClient){
   const actor=typeof job.payload.actor==='string'?job.payload.actor:'unknown actor';
   const failures=typeof job.payload.failureCount==='number'?job.payload.failureCount:0;
   const sourceIps=Array.isArray(job.payload.sourceIps)?job.payload.sourceIps:[];
-  return { ...base,kind:'INVESTIGATE' as const,summary:`${failures} failed login events for ${actor} were recorded in the immutable incident snapshot across ${sourceIps.length} source IP${sourceIps.length===1?'':'s'}.`,recommendation:'Review the linked evidence and confirm the activity with the account owner before taking any action.',failureCount:failures,sourceIpCount:sourceIps.length };
+  const summary=typeof job.payload.summary==='string'?job.payload.summary:`${failures} failed login events for ${actor} were recorded in the immutable incident snapshot across ${sourceIps.length} source IP${sourceIps.length===1?'':'s'}.`;
+  return { ...base,kind:'INVESTIGATE' as const,summary,recommendation:'Review the triggering evidence and related events. This deterministic pattern is suspicious activity, not confirmation of an attack.',failureCount:failures,sourceIpCount:sourceIps.length };
  }
  const requestedBy=job.payload.requestedBy,approvedBy=job.payload.approvedBy;
  if(job.payload.approved!==true||typeof requestedBy!=='string'||typeof approvedBy!=='string'||requestedBy===approvedBy||!job.response_id||typeof job.payload.actor!=='string'||!client)throw new AutomationProviderError('APPROVAL_INVALID');

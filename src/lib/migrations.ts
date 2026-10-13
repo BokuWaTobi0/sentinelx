@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { SqlClient } from './sql-client';
-export const migrations=['001_init','002_detection','003_response','004_automation'] as const;
+export const migrations=['001_init','002_detection','003_response','004_automation','005_day8_detection_timeline','006_day9_collaboration'] as const;
 export async function applyMigrations(client:SqlClient){
  await client.query('BEGIN');
  try {

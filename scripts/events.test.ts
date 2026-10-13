@@ -7,10 +7,12 @@ const good={id:'00000000-0000-4000-8000-000000000011',occurredAt:new Date(now).t
 test('validate batches, timestamps, IPs and structured payloads',()=>{
  assert.equal(parseBatch({events:[good]},now).success,true);
  assert.equal(parseBatch({events:[{...good,sourceIp:'garbage'}]},now).success,false);
+ assert.equal(parseBatch({events:[{...good,sourceIp:undefined}]},now).success,false);
  assert.equal(parseBatch({events:[{...good,occurredAt:new Date(now+61000).toISOString()}]},now).success,false);
  assert.equal(parseBatch({events:[{...good,occurredAt:new Date(now-8*86400000).toISOString()}]},now).success,false);
  assert.equal(parseBatch({events:[{...good,eventType:'UNKNOWN'}]},now).success,false);
  assert.equal(parseBatch({events:[{...good,payload:{password:'secret'}}]},now).success,false);
+ for(const scenario of ['normal','login-burst','password-spray','ip-failures','success-after-burst'] as const)assert.equal(parseBatch({events:[{...good,payload:{demo:true,scenario}}]},now).success,true);
  assert.equal(parseBatch({events:[]},now).success,false);
  assert.equal(parseBatch({events:Array(101).fill(good)},now).success,false);
  assert.equal(parseFilters(new URLSearchParams('eventType=UNKNOWN')).success,false);
