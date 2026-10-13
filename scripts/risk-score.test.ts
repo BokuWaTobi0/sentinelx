@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {scoreIncident,priorityBand,SCORING_VERSION} from '../src/lib/risk-score';
+import {applyMigrations} from '../src/lib/migrations';
+import type {SqlClient} from '../src/lib/sql-client';
+import type {QueryResultRow} from 'pg';
+async function migrated(db:PGlite){const client:SqlClient={async query<Row extends QueryResultRow>(sql:string,values?:unknown[]){if(values===undefined){await db.exec(sql);return {rows:[] as Row[]};}return db.query<Row>(sql,values);}};await applyMigrations(client);}
 const evidence=(patch:Record<string,unknown>={})=>({detector:'failed-login-burst-v1',failureCount:5,eventIds:['evidence-id'],actor:'label',sourceIps:['192.0.2.1'],...patch});
 test('priority score factors are deterministic, capped and avoid duplicate count factors',()=>{
  const small=scoreIncident(evidence())!;assert.equal(small.score,20);assert.equal(small.band,'LOW');assert.equal(small.version,SCORING_VERSION);assert.deepEqual(small,scoreIncident(evidence()));assert.equal(small.factors.length,3);
@@ -12,7 +16,7 @@ test('priority score factors are deterministic, capped and avoid duplicate count
 test('priority band boundaries and score cap are explicit',()=>{assert.equal(priorityBand(0),'LOW');assert.equal(priorityBand(29),'LOW');assert.equal(priorityBand(30),'MEDIUM');assert.equal(priorityBand(59),'MEDIUM');assert.equal(priorityBand(60),'HIGH');assert.equal(priorityBand(79),'HIGH');assert.equal(priorityBand(80),'CRITICAL');assert.equal(priorityBand(100),'CRITICAL');const score=scoreIncident(evidence({failureCount:10000,actorCount:100,sourceIps:Array.from({length:8},(_,i)=>`192.0.2.${i+1}`),detector:'success-after-failure-burst-v1'}))!;assert.equal(score.score,100);});
 test('insufficient or unknown immutable evidence remains unscored',()=>{assert.equal(scoreIncident({}),null);assert.equal(scoreIncident(evidence({eventIds:[]})),null);assert.equal(scoreIncident(evidence({failureCount:0})),null);assert.equal(scoreIncident(evidence({detector:'unknown'})),null);});
 test('score version and factor explanation persist once; conditional backfill is idempotent',async()=>{
- const db=new PGlite();try{await db.exec(await readFile('db/migrations/001_init.sql','utf8'));await db.exec(await readFile('db/migrations/007_day10_risk_live.sql','utf8'));
+ const db=new PGlite();try{await migrated(db);
  const score=scoreIncident(evidence())!;const inserted=await db.query<{id:string}>(`INSERT INTO alerts(title,rule_id,severity,evidence,priority_score,priority_band,scoring_version,score_factors,scored_at) VALUES ('incident','failed-login-burst-v1','HIGH',$1,$2,$3,$4,$5,now()) RETURNING id`,[JSON.stringify(evidence()),score.score,score.band,score.version,JSON.stringify(score.factors)]);const id=inserted.rows[0].id;
  const first=await db.query(`UPDATE alerts SET priority_score=$1,priority_band=$2,scoring_version=$3,score_factors=$4,scored_at=now() WHERE id=$5 AND priority_score IS NULL`,[80,'CRITICAL','priority-v2','[]',id]);assert.equal(first.rowCount,0);
  await db.query(`UPDATE alerts SET status='RESOLVED' WHERE id=$1`,[id]);const stored=await db.query<{priority_score:number;priority_band:string;scoring_version:string;score_factors:{key:string}[]}>(`SELECT priority_score,priority_band,scoring_version,score_factors FROM alerts WHERE id=$1`,[id]);assert.equal(stored.rows[0].priority_score,20);assert.equal(stored.rows[0].priority_band,'LOW');assert.equal(stored.rows[0].scoring_version,SCORING_VERSION);assert.equal(stored.rows[0].score_factors[0].key,'detection_rule');

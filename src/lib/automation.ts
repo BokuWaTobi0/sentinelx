@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { SqlClient } from './sql-client';
-export type AutomationJob={id:string;incident_id:string;response_id:string|null;kind:'INVESTIGATE'|'CONTAIN_SIMULATED';status:'QUEUED'|'RUNNING'|'SUCCEEDED'|'FAILED';payload:Record<string,unknown>;result:Record<string,unknown>|null;attempts:number;lease_token:string|null;error_code:string|null;created_at:Date;finished_at:Date|null};
+export type AutomationJob={id:string;incident_id:string;response_id:string|null;kind:'INVESTIGATE'|'CONTAIN_SIMULATED';status:'QUEUED'|'RUNNING'|'SUCCEEDED'|'FAILED';provider:'LOCAL'|'WINDMILL'|null;payload:Record<string,unknown>;result:Record<string,unknown>|null;attempts:number;lease_token:string|null;error_code:string|null;created_at:Date;finished_at:Date|null};
 const resultBase={jobId:z.string().uuid(),incidentId:z.string().uuid(),engine:z.enum(['LOCAL','WINDMILL']),realWorldChanges:z.literal(false),windmillRunId:z.string().uuid().optional()};
 export const automationResult=z.discriminatedUnion('kind',[
  z.object({...resultBase,kind:z.literal('INVESTIGATE'),summary:z.string().min(1).max(2000),recommendation:z.string().min(1).max(2000),failureCount:z.number().int().nonnegative(),sourceIpCount:z.number().int().nonnegative()}),
@@ -15,12 +15,12 @@ export async function enqueueAutomation(client:SqlClient,incidentId:string,kind:
  if(rows.length)await client.query("INSERT INTO audit_logs(action,target_id,metadata) VALUES ('automation.queued',$1,$2)",[incidentId,JSON.stringify({jobId:id,kind,responseId})]);
  return rows[0]?.id??null;
 }
-export async function claimAutomation(client:SqlClient):Promise<AutomationJob|null>{
+export async function claimAutomation(client:SqlClient,provider?:'LOCAL'|'WINDMILL'):Promise<AutomationJob|null>{
  await client.query('BEGIN');
  try{
   const expired=await client.query<AutomationJob>(`UPDATE automation_jobs SET status='FAILED',error_code='LEASE_EXHAUSTED',lease_token=NULL,lease_expires_at=NULL,finished_at=now() WHERE status='RUNNING' AND lease_expires_at<now() AND attempts>=5 RETURNING *`);
   for(const job of expired.rows)await client.query("INSERT INTO audit_logs(action,target_id,metadata) VALUES ('automation.failed',$1,$2)",[job.incident_id,JSON.stringify({jobId:job.id,errorCode:'LEASE_EXHAUSTED'})]);
-  const {rows:[job]}=await client.query<AutomationJob>(`WITH candidate AS (SELECT id FROM automation_jobs WHERE attempts<5 AND ((status='QUEUED' AND next_attempt_at<=now()) OR (status='RUNNING' AND lease_expires_at<now())) ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE automation_jobs j SET status='RUNNING',attempts=attempts+1,lease_token=$1,lease_expires_at=now()+interval '90 seconds' FROM candidate c WHERE j.id=c.id RETURNING j.*`,[randomUUID()]);
+  const {rows:[job]}=await client.query<AutomationJob>(`WITH candidate AS (SELECT id FROM automation_jobs WHERE attempts<5 AND ((status='QUEUED' AND next_attempt_at<=now()) OR (status='RUNNING' AND lease_expires_at<now())) ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE automation_jobs j SET status='RUNNING',attempts=attempts+1,provider=COALESCE($2::text,j.provider),lease_token=$1,lease_expires_at=now()+interval '90 seconds' FROM candidate c WHERE j.id=c.id RETURNING j.*`,[randomUUID(),provider??null]);
   if(job)await client.query("INSERT INTO audit_logs(action,target_id,metadata) VALUES ('automation.started',$1,$2)",[job.incident_id,JSON.stringify({jobId:job.id,kind:job.kind,attempt:job.attempts})]);
   await client.query('COMMIT');return job??null;
  }catch(error){await client.query('ROLLBACK');throw error;}

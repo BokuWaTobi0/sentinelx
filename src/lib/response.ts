@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { enqueueAutomation } from './automation';
 import type { SqlClient } from './sql-client';
 import type { Role } from './rbac';
+import {notifyActiveAdmins,notifyUsers} from './notifications';
 
 export class ResponseError extends Error {}
 export const requestSchema=z.object({incidentId:z.string().uuid(),reason:z.string().trim().min(10).max(1000)});
@@ -28,6 +29,7 @@ export async function requestResponse(client:SqlClient,identity:Identity,input:u
   if(!request)throw new ResponseError('A response request is already awaiting approval or workflow completion for this incident.');
   await client.query("INSERT INTO audit_logs(user_id,action,target_id,metadata) VALUES ($1,'response.requested',$2,$3)",[identity.id,data.incidentId,JSON.stringify({requestId:request.id,actor,reason:data.reason,mode:'SIMULATION'})]);
   await client.query("INSERT INTO incident_history(incident_id,actor_id,action) VALUES ($1,$2,'RESPONSE_REQUESTED')",[data.incidentId,identity.id]);
+  await notifyActiveAdmins(client,{incidentId:data.incidentId,kind:'RESPONSE_REVIEW_REQUESTED',title:'Independent response review requested',message:'A simulated containment request is awaiting Admin review.',dedupeKey:`response:${request.id}:review`},identity.id);
   await client.query('COMMIT');return request.id;
  }catch(error){await client.query('ROLLBACK');throw error;}
 }
@@ -49,6 +51,8 @@ export async function decideResponse(client:SqlClient,identity:Identity,input:un
   await client.query('UPDATE response_requests SET status=$1,decided_by=$2,decision_note=$3,result=$4,decided_at=now() WHERE id=$5',[result?'APPROVED':'REJECTED',identity.id,data.note,null,request.id]);
   await client.query('INSERT INTO audit_logs(user_id,action,target_id,metadata) VALUES ($1,$2,$3,$4)',[identity.id,result?'response.approved':'response.rejected',request.incident_id,JSON.stringify({requestId:request.id,note:data.note,actor:request.target_actor,mode:'SIMULATION'})]);
   await client.query("INSERT INTO incident_history(incident_id,actor_id,action) VALUES ($1,$2,$3)",[request.incident_id,identity.id,result?'RESPONSE_APPROVED':'RESPONSE_REJECTED']);
+  const {rows:[requester]}=await client.query<{id:string}>("SELECT id FROM users WHERE id=$1 AND role='ANALYST' AND NOT disabled",[request.requested_by]);
+  if(requester)await notifyUsers(client,[requester.id],{incidentId:request.incident_id,kind:'RESPONSE_DECIDED',title:`Response request ${result?'approved':'rejected'}`,message:`An Admin ${result?'approved':'rejected'} your simulated response request.`,dedupeKey:`response:${request.id}:decision`,requiredRole:'ANALYST'});
   if(result)await enqueueAutomation(client,request.incident_id,'CONTAIN_SIMULATED',{actor:request.target_actor,approved:true,requestedBy:request.requested_by,approvedBy:identity.id},request.id);
   await client.query('COMMIT');return request.incident_id;
  }catch(error){await client.query('ROLLBACK');throw error;}

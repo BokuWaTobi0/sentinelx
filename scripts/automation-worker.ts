@@ -12,7 +12,7 @@ try{
  do{
   const client=await pool.connect();
   try{
-   const job=await claimAutomation(client);
+   const job=await claimAutomation(client,provider==='local'?'LOCAL':'WINDMILL');
    if(job){
     try{const result=provider==='local'?await runLocal(job,client):await runWindmill(job,config!);const saved=await settleAutomation(client,job,{result},provider);console.log(`${job.id}: ${saved?'completed':'lease superseded; result ignored'} ${job.kind}`);}
     catch(error){

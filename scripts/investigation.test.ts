@@ -1,11 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {parseAlertFilters,searchRecord,alertFilterValues,alertSearchSql,evidenceIds,evidenceEventsSql,relatedAlertsSql,eventSearchSql,timeSeconds,parseRelatedTimelineFilters,relatedTimelineSql,relatedTimelineValues,RELATED_TIMELINE_PAGE_SIZE} from '../src/lib/investigation';
 import {parseFilters} from '../src/lib/event-schema';
-async function database(run:(db:PGlite)=>Promise<void>){const db=new PGlite();try{await db.exec(await readFile('db/migrations/001_init.sql','utf8'));await db.exec(await readFile('db/migrations/007_day10_risk_live.sql','utf8'));await run(db);}finally{await db.close();}}
+import {applyMigrations} from '../src/lib/migrations';
+import type {SqlClient} from '../src/lib/sql-client';
+import type {QueryResultRow} from 'pg';
+async function database(run:(db:PGlite)=>Promise<void>){const db=new PGlite();try{const client:SqlClient={async query<Row extends QueryResultRow>(sql:string,values?:unknown[]){if(values===undefined){await db.exec(sql);return {rows:[] as Row[]};}return db.query<Row>(sql,values);}};await applyMigrations(client);await run(db);}finally{await db.close();}}
 test('filter validation rejects invalid enums, repeated keys and oversize fields',()=>{
  assert.equal(parseAlertFilters({}).success,true);
  assert.equal(parseAlertFilters({status:'BAD'}).success,false);

@@ -13,6 +13,7 @@ SentinelX receives simulated security events, detects suspicious authentication 
 - Incident response history and Admin-only audit history.
 - Versioned incident priority scores with stored point-by-point explanations from immutable detector evidence; score is separate from status and never authorizes response.
 - Authenticated live incident/dashboard updates using bounded polling, visibility pausing, backoff, and a new-incident indicator.
+- Admin-only, versioned detection-rule settings that apply prospectively; CSV/JSON event import with preview, row errors, deterministic retry IDs, and the regular detection pipeline; private in-app notifications routed by role and action.
 
 Containment does not disable real accounts or block IPs. Investigation summarizes the detection snapshot; it is not external threat intelligence or AI. This is a single-organization portfolio demo, not an enterprise security deployment.
 
@@ -59,7 +60,7 @@ npm.cmd run release:check
 npm.cmd run automation:check
 ```
 
-`release:check` validates the selected provider, environment format, database/schema and active role availability. `automation:check` validates the selected provider without modifying SentinelX records. DEMO.md provides local-demo steps; DAY6.md documents optional Windmill setup; DAY8.md documents detection thresholds and investigation timeline; DAY9.md documents collaboration, the redesigned interface, and the architecture explorer.
+`release:check` validates the selected provider, environment format, database/schema and active role availability. `automation:check` validates the selected provider without modifying SentinelX records. DEMO.md provides local-demo steps; DAY6.md documents optional Windmill setup; DAY8.md documents detection thresholds and investigation timeline; DAY9.md documents collaboration, the redesigned interface, and the architecture explorer; DAY10.md documents scoring and live refresh; DAY11.md documents configurable rules, event import, and notifications.
 
 ## Day 9 collaboration and architecture
 The incident page separates “What happened”, immutable “Evidence”, and “Next action”, then shows later related events and a separate collaboration history. Analysts and Admins can assign one active Analyst, append plain-text notes, and update incident status; only Admins can approve or reject simulated response. Assignment writes and audit rows commit atomically, stale assignment forms are rejected, and Viewer accounts remain read-only. The collaboration history uses an allowlisted table, separate from the Admin-only audit trail.
