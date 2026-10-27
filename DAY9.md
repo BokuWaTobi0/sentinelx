@@ -6,7 +6,7 @@ SentinelX now uses a consistent high-contrast, responsive workspace design with 
 
 Analysts and Admins can assign or unassign one active Analyst, and append plain-text notes (1–2,000 trimmed characters). Assignment changes lock the incident, compare the expected previous assignee, validate the target’s current active Analyst role, and commit the incident update, collaboration event, and audit event together. A stale form gives a refresh message. Notes and collaboration events are append-only. A separate allowlisted `incident_history` table records assignment, note, status, and response request/decision events. It does not copy or expose Admin audit metadata. The existing audit view remains Admin-only.
 
-The new **Explore SentinelX** view presents the implemented ingestion → detection → incident evidence → durable queue → human approval → selected provider sequence. Investigation runs automatically; approval is required only for simulated containment. Local is the default provider. Windmill remains optional. All containment remains simulated and never changes real accounts, networks, or devices.
+The new **Explore SentinelX** view presents the implemented ingestion → detection → incident evidence → durable queue → human approval → selected provider sequence as a scroll-based six-step explanation. `IntersectionObserver` reveals steps progressively; if it is unavailable, all steps are shown. It does not execute jobs or control the worker. Investigation runs automatically; approval is required only for simulated containment. Local is the default provider. Windmill remains optional. All containment remains simulated and never changes real accounts, networks, or devices.
 
 ## Concepts and limits
 
@@ -16,8 +16,8 @@ The new **Explore SentinelX** view presents the implemented ingestion → detect
 - Notes are append-only plain text, limited to 2,000 characters, with author and UTC timestamp. HTML is escaped by normal React text rendering.
 - Collaboration history is not the Admin audit trail. Only explicitly recorded safe history fields are shown to all signed-in incident readers.
 - History uses stable descending `(created_at, id)` keyset pagination, 30 entries initially and at most 50 per request.
-- The explorer has no auto-spin or scroll capture. Orbit, pan, zoom, layer separation, and camera focus happen only after user input. Reduced-motion settings remove transitions.
-- The interactive view uses CSS 3D transforms and does not require WebGL. A complete static architecture map is always available; small screens show that map in place of the model. Unsupported transforms also show a graceful static fallback.
+- The explorer uses ordinary page scrolling and no motion controls. Reduced-motion settings reveal all steps immediately and disable the reveal transition.
+- Keyboard and mobile users read the same ordered list of six steps. If `IntersectionObserver` is unavailable, the component reveals the full list instead of hiding any stages.
 - No user or network action is performed by containment. The selected automation provider is displayed honestly.
 
 ## Migration and start commands (PowerShell)
@@ -79,11 +79,11 @@ npm.cmd run build
 
 ## Explorer and accessibility checks
 
-1. Open **Explore SentinelX**. Use **Rotate**, **Pan focus**, **Zoom**, **Explode layers**, select a component, and **Reset view**. No movement should occur until a control is used.
-2. Use Tab/Shift+Tab and Enter/Space to operate model controls and select components. Focus rings must remain visible.
-3. Enable the operating system’s reduced-motion preference and repeat: scene transitions should stop.
-4. At a narrow/mobile viewport, confirm the interactive model gives way to the full static map, with each stage’s explanation still readable.
-5. If CSS 3D transforms are unavailable, confirm the static map and its explanations remain available without errors.
+1. Open **Explore SentinelX** and use normal scrolling to read all six architecture stages.
+2. Use Tab/Shift+Tab through navigation and links; focus rings remain visible.
+3. Enable reduced motion; all stages should remain readable without reveal transitions.
+4. At a narrow/mobile viewport, confirm the ordered stages fit without horizontal overflow.
+5. Disable `IntersectionObserver` in browser devtools; all steps should appear.
 
 ## Local demo verification
 

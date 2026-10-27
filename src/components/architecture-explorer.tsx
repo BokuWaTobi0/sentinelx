@@ -37,7 +37,7 @@ export function ArchitectureExplorer() {
     return () => observer.disconnect();
   }, []);
 
-  return <div className="architecture-scroll" aria-label="SentinelX architecture, revealed step by step">
+  return <div className="architecture-scroll" role="region" aria-label="SentinelX architecture, revealed step by step">
     <div className="architecture-progress" role="status" aria-live="polite">
       <span>Architecture path</span><strong>{Math.max(visibleCount, 1)} / {steps.length} steps revealed</strong>
       <div className="architecture-progress-track" aria-hidden="true"><span style={{ width: `${(visibleCount / steps.length) * 100}%` }} /></div>

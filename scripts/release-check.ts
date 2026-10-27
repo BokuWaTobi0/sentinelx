@@ -6,7 +6,7 @@ try{
  if(process.env.DATABASE_URL){
   pool=new Pool({connectionString:process.env.DATABASE_URL,max:1,connectionTimeoutMillis:5000,statement_timeout:10000});
   const {rows}=await pool.query<{version:string}>('SELECT version FROM schema_migrations');
-  checks.push({name:'All six migrations applied',passed:migrationReady(rows.map(row=>row.version))});
+  checks.push({name:'All database migrations applied',passed:migrationReady(rows.map(row=>row.version))});
   const {rows:[roles]}=await pool.query<{roles:string[]}>('SELECT array_agg(DISTINCT role) AS roles FROM users WHERE NOT disabled');
   checks.push({name:'Active Viewer, Analyst and Admin available',passed:['VIEWER','ANALYST','ADMIN'].every(role=>roles?.roles?.includes(role))});
   const {rows:jobs}=await pool.query<{status:string;count:string}>('SELECT status,count(*) FROM automation_jobs GROUP BY status ORDER BY status');

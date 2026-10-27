@@ -14,8 +14,9 @@ SentinelX receives simulated security events, detects suspicious authentication 
 - Versioned incident priority scores with stored point-by-point explanations from immutable detector evidence; score is separate from status and never authorizes response.
 - Authenticated live incident/dashboard updates using bounded polling, visibility pausing, backoff, and a new-incident indicator.
 - Admin-only, versioned detection-rule settings that apply prospectively; CSV/JSON event import with preview, row errors, deterministic retry IDs, and the regular detection pipeline; private in-app notifications routed by role and action.
+- Authorized JSON and readable PDF incident reports built from one repeatable-read database snapshot, with bounded evidence/history and explicitly separated immutable trigger events.
 
-Containment does not disable real accounts or block IPs. Investigation summarizes the detection snapshot; it is not external threat intelligence or AI. This is a single-organization portfolio demo, not an enterprise security deployment.
+Containment does not disable real accounts or block IPs. Investigation summarizes the detection snapshot; it is not external threat intelligence or AI. Reports use built-in PDF fonts and printable western text; unsupported glyphs are replaced in PDF while JSON preserves the original authorized strings. Related events remain separate live context and are not included in reports. This is a single-organization portfolio demo, not an enterprise security deployment.
 
 ## Automation provider
 `AUTOMATION_PROVIDER` accepts `local` or `windmill` and defaults to `local`. Local automation needs no Windmill credentials and makes no external requests. Set it to `windmill` to use the existing Windmill flow, with `WINDMILL_WEBHOOK_URL` and `WINDMILL_TOKEN` configured. Result receipts record `LOCAL` or `WINDMILL` accurately.
@@ -60,12 +61,12 @@ npm.cmd run release:check
 npm.cmd run automation:check
 ```
 
-`release:check` validates the selected provider, environment format, database/schema and active role availability. `automation:check` validates the selected provider without modifying SentinelX records. DEMO.md provides local-demo steps; DAY6.md documents optional Windmill setup; DAY8.md documents detection thresholds and investigation timeline; DAY9.md documents collaboration, the redesigned interface, and the architecture explorer; DAY10.md documents scoring and live refresh; DAY11.md documents configurable rules, event import, and notifications.
+`release:check` validates the selected provider, environment format, database/schema and active role availability. `automation:check` validates the selected provider without modifying SentinelX records. DEMO.md provides the five-minute local walkthrough; DAY6.md documents optional Windmill setup; DAY8.md documents detection thresholds and investigation timeline; DAY9.md documents collaboration and the scroll-based architecture path; DAY10.md documents scoring and live refresh; DAY11.md documents configurable rules, event import, and notifications; DAY12.md documents report exports, provider receipts, integration checks, and acceptance steps.
 
 ## Day 9 collaboration and architecture
 The incident page separates “What happened”, immutable “Evidence”, and “Next action”, then shows later related events and a separate collaboration history. Analysts and Admins can assign one active Analyst, append plain-text notes, and update incident status; only Admins can approve or reject simulated response. Assignment writes and audit rows commit atomically, stale assignment forms are rejected, and Viewer accounts remain read-only. The collaboration history uses an allowlisted table, separate from the Admin-only audit trail.
 
-Use **Explore SentinelX** for a manually controlled architecture model. Its static architecture map remains available for keyboard and mobile users; 3D transforms fall back to the static map where unavailable. The model explains that investigation is automatic while containment needs independent Admin approval. DAY9.md has collaboration acceptance steps; DAY10.md documents priority scoring, live update behavior, migration/backfill commands and role-based checks.
+Use **Explore SentinelX** for a six-step scroll-based explanation of event ingestion, detection, evidence, durable work, independent approval, and the selected automation provider. Steps progressively reveal through `IntersectionObserver`; if that API is unavailable or reduced motion is requested, all steps remain readable. It does not execute jobs or control the worker. The incident page offers PDF and JSON reports; report generation is audited after the report data is assembled and does not imply a completed download. DAY9.md has collaboration acceptance steps; DAY10.md documents priority scoring and live updates; DAY11.md covers rules, imports, and notifications; DAY12.md covers exports and end-to-end verification.
 
 ## Recovery
 - Database unavailable: start Docker Desktop, run `docker compose up -d --wait`, inspect `docker compose ps`, and confirm `DATABASE_URL`.
@@ -76,4 +77,4 @@ Use **Explore SentinelX** for a manually controlled architecture model. Its stat
 - Stop database without deleting data: `docker compose down`. Do not add `-v`.
 
 ## Limits
-No real containment, multi-tenancy, SSO/MFA, external threat intelligence, notification integrations, or tamper-proof audit storage. Remote flows may run more than once after timeouts; the included Windmill flow is side-effect-free. Database receipts prevent a stale worker from overwriting newer outcomes. Real remote actions would need connector-level idempotency and reconciliation.
+No real containment, multi-tenancy, SSO/MFA, external threat intelligence, email/Slack/push notification integrations, or tamper-proof audit storage. Reports omit sensitive-key fields, limit exact event rows to 100, collaboration/history and notes to the latest 100, and response/automation lists to the latest 50. Admin audit details are included only for Admin exports and capped at 100. Remote flows may run more than once after timeouts; the included Windmill flow is side-effect-free. Database receipts prevent a stale worker from overwriting newer outcomes. Real remote actions would need connector-level idempotency and reconciliation.
