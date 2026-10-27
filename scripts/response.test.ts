@@ -75,7 +75,7 @@ test('local provider executes containment only for queued independent Admin appr
   const ids=[];for(const role of ['ANALYST','ADMIN'] as Role[]){const {rows:[u]}=await db.query<{id:string}>("INSERT INTO users(email,name,password_hash,role) VALUES ($1,'Test','unused',$2) RETURNING id",[`${role.toLowerCase()}@local.test`,role]);ids.push({id:u.id,role});}
   const {rows:[incident]}=await db.query<{id:string}>("INSERT INTO alerts(title,rule_id,severity,evidence) VALUES ('Local','test','HIGH',$1) RETURNING id",[JSON.stringify({actor:'local-target'})]);
   const requestId=await requestResponse(db,ids[0],{incidentId:incident.id,reason:'Review this actor and contain only in simulation.'});
-  const unapproved={id:(await import('node:crypto')).randomUUID(),incident_id:incident.id,response_id:requestId,kind:'CONTAIN_SIMULATED',status:'RUNNING',payload:{actor:'local-target',approved:true,requestedBy:ids[0].id,approvedBy:ids[1].id},result:null,attempts:1,lease_token:null,error_code:null,created_at:new Date(),finished_at:null} as const;
+  const unapproved={id:(await import('node:crypto')).randomUUID(),incident_id:incident.id,response_id:requestId,kind:'CONTAIN_SIMULATED',status:'RUNNING',provider:'LOCAL',payload:{actor:'local-target',approved:true,requestedBy:ids[0].id,approvedBy:ids[1].id},result:null,attempts:1,lease_token:null,error_code:null,created_at:new Date(),finished_at:null} as const;
   await assert.rejects(runLocal(unapproved,db),/APPROVAL_INVALID/);
   await decideResponse(db,ids[1],{requestId,decision:'APPROVE',note:'Approve this simulated action independently.'});
   const job=await claimAutomation(db);assert.ok(job);const result=await runLocal(job,db);

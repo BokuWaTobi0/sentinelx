@@ -61,18 +61,18 @@ test('Windmill configuration requires a sync flow endpoint and keeps secrets out
 test('provider selection defaults to local, rejects unknown values, and local execution uses only the queued snapshot',async()=>{
  assert.equal(automationProvider({}), 'local');assert.equal(automationProvider({AUTOMATION_PROVIDER:'windmill'}),'windmill');
  assert.throws(()=>automationProvider({AUTOMATION_PROVIDER:'other'}),/INVALID_AUTOMATION_PROVIDER/);
- const job={id:randomUUID(),incident_id:randomUUID(),response_id:null,kind:'INVESTIGATE',status:'RUNNING',payload:{actor:'snapshot-actor',failureCount:8,sourceIps:['192.0.2.4']},result:null,attempts:1,lease_token:randomUUID(),error_code:null,created_at:new Date(),finished_at:null} satisfies AutomationJob;
+ const job={id:randomUUID(),incident_id:randomUUID(),response_id:null,kind:'INVESTIGATE',status:'RUNNING',provider:'LOCAL',payload:{actor:'snapshot-actor',failureCount:8,sourceIps:['192.0.2.4']},result:null,attempts:1,lease_token:randomUUID(),error_code:null,created_at:new Date(),finished_at:null} satisfies AutomationJob;
  const result=await runLocal(job);assert.equal(result.engine,'LOCAL');assert.equal(result.kind,'INVESTIGATE');if(result.kind!=='INVESTIGATE')throw new Error('Expected local investigation result');assert.match(result.summary,/snapshot-actor/);assert.equal(result.failureCount,8);assert.equal(result.sourceIpCount,1);
  assert.throws(()=>validateAutomationResult(job,{...result,engine:'WINDMILL'},'local'),/RESULT_PROVIDER_MISMATCH/);
 });
 test('local simulated containment requires an independent approval and honestly records LOCAL',async()=>{
- const job={id:randomUUID(),incident_id:randomUUID(),response_id:randomUUID(),kind:'CONTAIN_SIMULATED',status:'RUNNING',payload:{actor:'approved-actor',approved:true,requestedBy:randomUUID(),approvedBy:randomUUID()},result:null,attempts:1,lease_token:randomUUID(),error_code:null,created_at:new Date(),finished_at:null} satisfies AutomationJob;
+ const job={id:randomUUID(),incident_id:randomUUID(),response_id:randomUUID(),kind:'CONTAIN_SIMULATED',status:'RUNNING',provider:'LOCAL',payload:{actor:'approved-actor',approved:true,requestedBy:randomUUID(),approvedBy:randomUUID()},result:null,attempts:1,lease_token:randomUUID(),error_code:null,created_at:new Date(),finished_at:null} satisfies AutomationJob;
  await assert.rejects(runLocal(job),/APPROVAL_INVALID/);
  await assert.rejects(runLocal({...job,payload:{...job.payload,approvedBy:job.payload.requestedBy}}),/APPROVAL_INVALID/);
  await assert.rejects(runLocal({...job,payload:{...job.payload,approved:false}}),/APPROVAL_INVALID/);
 });
 test('real HTTP adapter authenticates, bounds responses and rejects Windmill errors or mismatched results',async()=>{
- const job={id:randomUUID(),incident_id:randomUUID(),kind:'INVESTIGATE',payload:{actor:'demo'},response_id:null,status:'RUNNING',result:null,attempts:1,lease_token:randomUUID(),error_code:null,created_at:new Date(),finished_at:null} satisfies AutomationJob;
+ const job={id:randomUUID(),incident_id:randomUUID(),kind:'INVESTIGATE',payload:{actor:'demo'},response_id:null,status:'RUNNING',provider:'WINDMILL',result:null,attempts:1,lease_token:randomUUID(),error_code:null,created_at:new Date(),finished_at:null} satisfies AutomationJob;
  let mode='ok';
  const server=createServer(async(req,res)=>{
   assert.equal(req.headers.authorization,'Bearer test-token');

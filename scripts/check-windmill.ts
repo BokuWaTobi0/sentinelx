@@ -3,7 +3,7 @@ import { windmillConfig,runWindmill,WindmillError } from '../src/lib/windmill';
 import type { AutomationJob } from '../src/lib/automation';
 import { automationProvider,runLocal } from '../src/lib/automation-provider';
 const id=randomUUID(),incidentId=randomUUID();
-const job:AutomationJob={id,incident_id:incidentId,response_id:null,kind:'INVESTIGATE',status:'RUNNING',payload:{jobId:id,incidentId,kind:'INVESTIGATE',responseId:null,actor:'connection-check-demo',failureCount:8,sourceIps:['192.0.2.10'],windowSeconds:60,demo:true},result:null,attempts:1,lease_token:null,error_code:null,created_at:new Date(),finished_at:null};
+const job:AutomationJob={id,incident_id:incidentId,response_id:null,kind:'INVESTIGATE',status:'RUNNING',provider:'WINDMILL',payload:{jobId:id,incidentId,kind:'INVESTIGATE',responseId:null,actor:'connection-check-demo',failureCount:8,sourceIps:['192.0.2.10'],windowSeconds:60,demo:true},result:null,attempts:1,lease_token:null,error_code:null,created_at:new Date(),finished_at:null};
 try{
  const provider=automationProvider();
  const result=provider==='local'?await runLocal(job):await runWindmill(job,windmillConfig());
