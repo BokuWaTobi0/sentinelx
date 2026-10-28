@@ -7,26 +7,28 @@ const optional=<T extends z.ZodType>(schema:T)=>z.preprocess(value=>value===''?u
 export const alertFiltersSchema=z.object({
  status:optional(z.enum(statusOptions)),severity:optional(z.enum(severityOptions)),priority:optional(z.enum(['LOW','MEDIUM','HIGH','CRITICAL'])),sort:z.enum(['newest','priority']).default('newest'),page:z.coerce.number().int().min(1).max(200).default(1),
  actor:optional(z.string().trim().max(128)),q:optional(z.string().trim().max(200)),
+ escalation:optional(z.enum(['PENDING','ACKNOWLEDGED'])),
  time:z.preprocess(value=>value===''?undefined:value,z.enum(timeOptions).default('all')),
 });
-export type AlertFilters={status?:typeof statusOptions[number];severity?:typeof severityOptions[number];priority?:'LOW'|'MEDIUM'|'HIGH'|'CRITICAL';sort?:'newest'|'priority';page?:number;actor?:string;q?:string;time:typeof timeOptions[number]};
+export type AlertFilters={status?:typeof statusOptions[number];severity?:typeof severityOptions[number];priority?:'LOW'|'MEDIUM'|'HIGH'|'CRITICAL';sort?:'newest'|'priority';page?:number;actor?:string;q?:string;escalation?:'PENDING'|'ACKNOWLEDGED';time:typeof timeOptions[number]};
 export function parseAlertFilters(input:Record<string,unknown>){return alertFiltersSchema.safeParse(input);}
 export function searchRecord(params:URLSearchParams){
  const result:Record<string,unknown>={};
- for(const key of ['status','severity','priority','sort','page','actor','q','time','eventType']){
+ for(const key of ['status','severity','priority','sort','page','actor','q','time','eventType','escalation']){
   const all=params.getAll(key);if(all.length) result[key]=all.length===1?all[0]:all;
  }
  return result;
 }
 export function timeSeconds(time:string){return time==='24h'?86400:time==='7d'?604800:null;}
 export const INCIDENT_PAGE_SIZE=25;
-export function alertFilterValues(filters:AlertFilters){const page=filters.page??1;return [filters.status??null,filters.severity??null,filters.actor||null,timeSeconds(filters.time),filters.q||null,filters.priority??null,filters.sort??'newest',INCIDENT_PAGE_SIZE,(page-1)*INCIDENT_PAGE_SIZE];}
+export function alertFilterValues(filters:AlertFilters){const page=filters.page??1;return [filters.status??null,filters.severity??null,filters.actor||null,timeSeconds(filters.time),filters.q||null,filters.priority??null,filters.sort??'newest',INCIDENT_PAGE_SIZE,(page-1)*INCIDENT_PAGE_SIZE,filters.escalation??null];}
 export const alertSearchSql=`SELECT id,title,rule_id,severity,status,evidence,created_at,priority_score,priority_band,scoring_version,score_factors,scored_at,count(*) OVER()::int AS total_matches FROM alerts
  WHERE ($1::text IS NULL OR status=$1) AND ($2::text IS NULL OR severity=$2)
  AND ($3::text IS NULL OR evidence->>'actor'=$3)
  AND ($4::int IS NULL OR created_at>=now()-make_interval(secs=>$4::int))
  AND ($5::text IS NULL OR strpos(lower(concat_ws(' ',title,rule_id,evidence->>'actor')),lower($5))>0)
  AND ($6::text IS NULL OR priority_band=$6)
+ AND ($10::text IS NULL OR EXISTS (SELECT 1 FROM viewer_escalations ve WHERE ve.incident_id=alerts.id AND ve.status=$10))
  ORDER BY CASE WHEN $7='priority' THEN priority_score END DESC NULLS LAST,created_at DESC,id DESC LIMIT $8 OFFSET $9`;
 export const evidenceEventsSql=`SELECT id,occurred_at,source,event_type,actor,host(source_ip) AS source_ip,payload,ingested_at
  FROM events WHERE id=ANY($1::uuid[]) ORDER BY occurred_at ASC,id ASC`;

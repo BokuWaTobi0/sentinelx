@@ -116,7 +116,7 @@ test('migration upgrades Day 1 without changing users and is safe to rerun',asyn
   await db.exec("CREATE TABLE schema_migrations(version text PRIMARY KEY,applied_at timestamptz DEFAULT now()); INSERT INTO schema_migrations(version) VALUES ('001_init');");
   await db.query("INSERT INTO users(email,name,password_hash,role) VALUES ('test@example.com','Test','preserve-this-hash','ADMIN')");
   await applyMigrations(migrationClient(db));await applyMigrations(migrationClient(db));
-  assert.equal((await db.query('SELECT * FROM schema_migrations')).rows.length,9);
+  assert.equal((await db.query('SELECT * FROM schema_migrations')).rows.length,10);
   const {rows:[user]}=await db.query<{password_hash:string}>('SELECT password_hash FROM users');
   assert.equal(user.password_hash,'preserve-this-hash');
   assert.equal((await db.query('SELECT * FROM detection_windows')).rows.length,0);

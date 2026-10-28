@@ -1,5 +1,5 @@
 import type {SqlClient} from './sql-client';
-export type NotificationKind='INCIDENT_NEW'|'STATUS_CHANGED'|'ASSIGNED'|'INVESTIGATION_REQUESTED'|'RESPONSE_REVIEW_REQUESTED'|'RESPONSE_DECIDED';
+export type NotificationKind='INCIDENT_NEW'|'STATUS_CHANGED'|'ASSIGNED'|'INVESTIGATION_REQUESTED'|'RESPONSE_REVIEW_REQUESTED'|'RESPONSE_DECIDED'|'ESCALATION_CREATED'|'ESCALATION_ACKNOWLEDGED'|'ESCALATION_STARTED'|'ESCALATION_COMPLETED'|'ESCALATION_REASSIGNED';
 export async function notifyUsers(client:SqlClient,recipients:string[],input:{incidentId:string;kind:NotificationKind;title:string;message:string;dedupeKey:string;requiredRole?:'VIEWER'|'ANALYST'|'ADMIN';excludedId?:string}){
  if(!recipients.length)return 0;
  const {rows}=await client.query<{id:string}>(`INSERT INTO notifications(recipient_id,incident_id,kind,title,message,dedupe_key)

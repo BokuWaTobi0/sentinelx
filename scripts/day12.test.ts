@@ -9,6 +9,7 @@ import {applyMigrations} from '../src/lib/migrations';
 import {loadInvestigationReport} from '../src/lib/investigation-report';
 import {renderInvestigationPdf} from '../src/lib/report-pdf';
 import {parseImportBytes,confirmImport} from '../src/lib/log-import';
+import {ingestEvents} from '../src/lib/ingest-events';
 import {assignIncident,addIncidentNote,requestAnalystInvestigation} from '../src/lib/collaboration';
 import {requestResponse,decideResponse} from '../src/lib/response';
 import {claimAutomation,settleAutomation} from '../src/lib/automation';
@@ -17,6 +18,13 @@ import {runLocal,automationProvider} from '../src/lib/automation-provider';
 function adapter(db:PGlite):SqlClient{return {async query<Row extends QueryResultRow>(sql:string,values?:unknown[]){if(values===undefined){if(/^\s*(SELECT|WITH|SHOW)\b/i.test(sql))return db.query<Row>(sql);await db.exec(sql);return {rows:[] as Row[]};}return db.query<Row>(sql,values);}};}
 async function fixture(){const db=new PGlite(),client=adapter(db);await applyMigrations(client);return {db,client,close:()=>db.close()};}
 async function user(db:PGlite,role:string,name:string){return (await db.query<{id:string}>('INSERT INTO users(email,name,password_hash,role) VALUES ($1,$2,\'unused\',$3) RETURNING id',[`${randomUUID()}@report.invalid`,name,role])).rows[0].id;}
+test('Day 12 multi-incident scoring demo assigns an individual score and explanation to every burst',async()=>{const {db,client,close}=await fixture();try{
+ const start=Date.now()-60000,events=Array.from({length:23},(_,i)=>{const actor=i<8?'single-score-actor':'multi-score-actor',index=i<8?i:i-8;return {id:randomUUID(),occurredAt:new Date(start+index*1000).toISOString(),source:'day12-scoring-demo',eventType:'LOGIN_FAILURE' as const,actor,sourceIp:i<8?'192.0.2.41':'192.0.2.42',payload:{demo:true,scenario:'login-burst' as const}};});
+ const result=await ingestEvents(client,events);assert.equal(result.alertsCreated,2);
+ const {rows}=await db.query<{actor:string;priority_score:number;priority_band:string;scoring_version:string;score_factors:{key:string;points:number}[]}>('SELECT evidence->>\'actor\' AS actor,priority_score,priority_band,scoring_version,score_factors FROM alerts WHERE evidence->>\'actor\' IN ($1,$2) ORDER BY evidence->>\'actor\'',['single-score-actor','multi-score-actor']);
+ assert.deepEqual(rows.map(row=>({actor:row.actor,score:row.priority_score,band:row.priority_band,version:row.scoring_version})),[{actor:'multi-score-actor',score:30,band:'MEDIUM',version:'priority-v1'},{actor:'single-score-actor',score:20,band:'LOW',version:'priority-v1'}]);
+ for(const row of rows){assert.deepEqual(row.score_factors.map(factor=>factor.key),['detection_rule','failure_volume','distinct_context']);assert.equal(row.score_factors.reduce((total,factor)=>total+factor.points,0),row.priority_score);}
+}finally{await close();}});
 test('report snapshot includes authorized fields, redacts secrets, and flags old/truncated data',async()=>{const {db,client,close}=await fixture();try{
  const viewer=await user(db,'VIEWER','Report Viewer'),analyst=await user(db,'ANALYST','Report Analyst'),admin=await user(db,'ADMIN','Report Admin');
  const ids=Array.from({length:101},()=>randomUUID()),incident=(await db.query<{id:string}>(`INSERT INTO alerts(title,rule_id,severity,evidence,assigned_to) VALUES ($1,'failed-login-burst-v1','HIGH',$2,$3) RETURNING id`,['Report (old) incident',JSON.stringify({detector:'failed-login-burst-v1',actor:'analyst-user',eventIds:ids,apiToken:'not-for-export',explanation:'A deterministic burst matched.'}),analyst])).rows[0].id;

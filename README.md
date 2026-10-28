@@ -78,3 +78,7 @@ Use **Explore SentinelX** for a six-step scroll-based explanation of event inges
 
 ## Limits
 No real containment, multi-tenancy, SSO/MFA, external threat intelligence, email/Slack/push notification integrations, or tamper-proof audit storage. Reports omit sensitive-key fields, limit exact event rows to 100, collaboration/history and notes to the latest 100, and response/automation lists to the latest 50. Admin audit details are included only for Admin exports and capped at 100. Remote flows may run more than once after timeouts; the included Windmill flow is side-effect-free. Database receipts prevent a stale worker from overwriting newer outcomes. Real remote actions would need connector-level idempotency and reconciliation.
+
+## Day 13: Viewer to Analyst escalation
+
+Viewers can submit a reasoned escalation to an active Analyst. The official system priority score is snapshotted separately from the optional Viewer assessment and is never overridden. Analysts acknowledge, investigate, and complete the review in order; private per-user notifications keep the requester informed. See [DAY13.md](DAY13.md) for the lifecycle, permissions, migration command, and acceptance checklist.

@@ -30,7 +30,7 @@ test('rule configuration is Admin-only, bounded, optimistic, audited, and applie
  assert.equal((await ingestEvents(client,events)).alertsCreated,0);
  const more=Array.from({length:2},(_,i)=>({...events[0],id:randomUUID(),occurredAt:new Date(now+1000+i*1000).toISOString()}));
  assert.equal((await ingestEvents(client,more)).alertsCreated,1);
- const {rows:[alert]}=await db.query<{detection_config_version:number}>('SELECT detection_config_version FROM alerts WHERE evidence->>\'actor\'=$1',['prospective-target']);assert.equal(alert.detection_config_version,2);
+ const {rows:[alert]}=await db.query<{detection_config_version:number;priority_score:number;priority_band:string;scoring_version:string;score_factors:{key:string;points:number}[]}>('SELECT detection_config_version,priority_score,priority_band,scoring_version,score_factors FROM alerts WHERE evidence->>\'actor\'=$1',['prospective-target']);assert.equal(alert.detection_config_version,2);assert.equal(alert.priority_score,20);assert.equal(alert.priority_band,'LOW');assert.equal(alert.scoring_version,'priority-v1');assert.deepEqual(alert.score_factors.map(factor=>factor.key),['detection_rule','failure_volume','distinct_context']);
  assert.equal((await db.query<{n:number}>("SELECT count(*)::int AS n FROM audit_logs WHERE action='detection.configuration_updated'")).rows[0].n,1);
  }finally{await close();}});
 test('import parses quoted CSV and JSON, previews without writes, preserves IDs, and exact retries deduplicate',async()=>{const {db,client,close}=await setup();try{
