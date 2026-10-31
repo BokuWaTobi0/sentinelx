@@ -1,9 +1,48 @@
-import { login } from '@/app/auth-actions';
-import { currentUser } from '@/lib/auth';
+import type { Metadata } from 'next';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { currentUser } from '@/lib/auth';
 import { Icon } from '@/components/icon';
-import { SubmitButton } from '@/components/submit-button';
-export default async function Login({searchParams}:{searchParams:Promise<{error?:string}>}){
- if(await currentUser()) redirect('/dashboard');const {error}=await searchParams;
- return <div className="login-layout"><div className="login-art"><a className="brand" href="/login"><span className="brand-mark"><Icon name="shield" size={23}/></span>Sentinel<span className="brand-x">X</span></a><div className="orbital" aria-hidden="true"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="orbit orbit-three"/><div className="orbit-core"><Icon name="shield" size={52}/></div><span className="orbit-point point-one"/><span className="orbit-point point-two"/><span className="orbit-point point-three"/></div><div className="login-manifesto"><p className="eyebrow">CLARITY IN THE NOISE</p><h1>Every signal.<br/>A clearer picture.</h1><p>Connect activity, investigate patterns, and understand the evidence behind each alert.</p></div><div className="login-art-footer">IDENTITY · TELEMETRY · INTELLIGENCE<span>01 / SECURITY OPERATIONS</span></div></div><div className="login-form-side"><span className="environment"><span/>LOCAL DEMO ENVIRONMENT</span><div className="login-form-wrap"><p className="eyebrow">WELCOME BACK</p><h2>Enter your workspace</h2><p className="page-description">Sign in to the SentinelX command center.</p>{error&&<p className="error" role="alert">{error==='unavailable'?'Sign-in is temporarily unavailable. Check that PostgreSQL is running and try again.':error==='limited'?'Too many attempts. Try again after 15 minutes.':'Invalid email or password.'}</p>}<form action={login} className="login-form"><label>Email address<input name="email" type="email" required autoComplete="username" maxLength={254} placeholder="you@organization.com"/></label><label>Password<input name="password" type="password" required autoComplete="current-password" maxLength={72} placeholder="Enter your password"/></label><SubmitButton pendingText="Signing in…" className="button login-submit">Sign in <Icon name="arrow"/></SubmitButton></form><div className="login-assurance"><Icon name="lock" size={15}/><span>Access is governed by your assigned role.</span></div></div><small className="login-footer">SentinelX · Your security workspace</small></div></div>;
+import { LoginForm } from '@/components/login-form';
+import { Terrain } from '@/components/site/terrain';
+import '@/styles/public.css';
+import '@/styles/login.css';
+
+export const metadata: Metadata = { title: 'Sign in — SentinelX', description: 'Sign in to your SentinelX workspace.' };
+
+export default async function Login({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  if (await currentUser()) redirect('/dashboard');
+  const { error } = await searchParams;
+  return (
+    <div className="sx-scope lx-layout">
+      <div className="lx-form-side">
+        <div className="lx-top">
+          <Link className="brand" href="/" aria-label="SentinelX home">
+            <span className="brand-mark"><Icon name="shield" size={21} /></span>
+            Sentinel<span className="brand-x">X</span>
+          </Link>
+          <Link className="lx-back" href="/">
+            <span className="lx-back__arrow"><Icon name="arrowLeft" size={16} /></span>
+            Back to home
+          </Link>
+        </div>
+
+        <div className="lx-form-wrap">
+          <h1 className="lx-title">Welcome back</h1>
+          <p className="lx-lead">Sign in to your SentinelX workspace.</p>
+          <LoginForm error={error} />
+          <p className="lx-assurance"><Icon name="lock" size={15} />Access is governed by your assigned role.</p>
+        </div>
+
+        <p className="lx-foot"><span className="lx-env"><i aria-hidden="true" />Local demo environment</span></p>
+      </div>
+
+      <aside className="lx-art" aria-hidden="true">
+        <Terrain className="lx-art__terrain" />
+        <div className="lx-art__copy">
+          <p>Every signal.<br />A <span className="sx-accent">clearer picture.</span></p>
+        </div>
+      </aside>
+    </div>
+  );
 }

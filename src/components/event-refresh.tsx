@@ -8,5 +8,5 @@ export function EventRefresh(){
   const timer=setInterval(()=>{if(document.visibilityState==='visible') router.refresh();},5000);
   return ()=>clearInterval(timer);
  },[router]);
- return <button className="button secondary" type="button" onClick={()=>router.refresh()}><Icon name="refresh"/>Refresh events</button>;
+ return <button className="sx-btn sx-btn--ghost sx-btn--sm" type="button" onClick={()=>router.refresh()}><Icon name="refresh" size={15}/>Refresh</button>;
 }
