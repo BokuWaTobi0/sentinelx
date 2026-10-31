@@ -1,0 +1,160 @@
+/*
+ * SentinelX public surfaces (home + sign in): shared tokens, buttons, brand.
+ * Everything is namespaced (.sx-*, .lx-*) so nothing leaks into the dashboard.
+ * Colours come from the existing :root palette in globals.css (--bg, --lime, --amber, --red).
+ */
+.sx-scope {
+  --sx-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --sx-bg: #080b0d;
+  --sx-bg-raised: #0e1215;
+  --sx-line: rgba(255, 255, 255, 0.08);
+  --sx-line-strong: rgba(255, 255, 255, 0.15);
+  --sx-text: #f2f5f7;
+  --sx-text-2: #a9b4be;
+  --sx-text-3: #86929d;
+  --sx-lime: var(--lime, #c4f56a);
+  --sx-lime-ink: #142008;
+  --sx-red: var(--red, #f29393);
+  --sx-amber: var(--amber, #efbd72);
+  --sx-violet: #aa9ef4;
+  --sx-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  position: relative;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--sx-bg);
+  color: var(--sx-text);
+  font-family: var(--sx-font);
+  font-size: 16px;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+}
+.sx-scope *,
+.sx-scope *::before,
+.sx-scope *::after { box-sizing: border-box; }
+:where(.sx-scope) :is(h1, h2, h3, h4, p, ul, ol, dl, dd, figure) { margin: 0; padding: 0; }
+:where(.sx-scope) :is(ul, ol) { list-style: none; }
+:where(.sx-scope) :is(button) { color: inherit; font: inherit; background: none; border: 0; padding: 0; }
+.sx-scope .tone-high { --tone: var(--sx-red); --tone-bg: rgba(242, 147, 147, 0.12); --tone-bd: rgba(242, 147, 147, 0.3); }
+.sx-scope .tone-medium { --tone: var(--sx-amber); --tone-bg: rgba(239, 189, 114, 0.12); --tone-bd: rgba(239, 189, 114, 0.3); }
+.sx-scope .tone-low { --tone: var(--sx-violet); --tone-bg: rgba(170, 158, 244, 0.13); --tone-bd: rgba(170, 158, 244, 0.3); }
+.sx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sx-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.sx-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--tone, var(--sx-lime)); }
+
+/* Smooth in-page anchors only while a public page is mounted. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.sx-scope) { scroll-behavior: smooth; }
+}
+html:has(.sx-scope) { scroll-padding-top: 96px; }
+
+/* Focus: always visible, never colour-only. */
+.sx-scope :focus-visible {
+  outline: 2px solid var(--sx-lime);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.sx-skip {
+  position: fixed;
+  left: 16px;
+  top: -64px;
+  z-index: 100;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: var(--sx-lime);
+  color: var(--sx-lime-ink);
+  font-weight: 600;
+  transition: top 0.3s var(--sx-ease);
+}
+.sx-skip:focus { top: 16px; }
+
+/* Brand (reuses the dashboard's .brand / .brand-mark / .brand-x) */
+.sx-scope .brand { font-family: var(--sx-font); }
+.sx-scope .brand .brand-mark { margin-bottom: 0; }
+
+/* Buttons */
+.sx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 26px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.35s var(--sx-ease),
+    box-shadow 0.5s var(--sx-ease),
+    background-color 0.3s var(--sx-ease),
+    border-color 0.3s var(--sx-ease),
+    color 0.3s var(--sx-ease);
+}
+.sx-btn:active { transform: scale(0.965); transition-duration: 0.12s; }
+.sx-btn--sm { min-height: 40px; padding: 0 18px; font-size: 14px; }
+.sx-btn--lg { min-height: 54px; padding: 0 30px; font-size: 16px; }
+.sx-btn--primary { background: var(--sx-lime); color: var(--sx-lime-ink); box-shadow: 0 0 0 0 rgba(196, 245, 106, 0); }
+.sx-btn--ghost {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--sx-line-strong);
+  color: var(--sx-text);
+}
+.sx-btn__arrow { display: inline-flex; transition: transform 0.45s var(--sx-ease); }
+
+@media (hover: hover) and (pointer: fine) {
+  .sx-btn--primary:hover {
+    background: #d3f98c;
+    box-shadow: 0 0 0 1px rgba(196, 245, 106, 0.55), 0 10px 42px -8px rgba(196, 245, 106, 0.6);
+  }
+  .sx-btn--ghost:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(196, 245, 106, 0.45); }
+  .sx-btn:hover .sx-btn__arrow { transform: translateX(4px); }
+  .sx-btn:hover .sx-btn__arrow--back { transform: translateX(-4px); }
+}
+.sx-btn:focus-visible { border-radius: 999px; }
+
+.sx-accent { color: var(--sx-lime); }
+
+.sx-eyebrow {
+  display: inline-block;
+  margin-bottom: 18px;
+  color: var(--sx-lime);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Reveal-on-scroll: pending -> in -> (attribute removed). See ScrollReveal. */
+[data-rv] {
+  transition: opacity 0.9s var(--sx-ease) var(--d, 0s), transform 0.9s var(--sx-ease) var(--d, 0s);
+}
+[data-rv="pending"] { opacity: 0; transform: translate3d(0, 26px, 0); }
+[data-rv="in"] { opacity: 1; transform: none; }
+[data-reveal="line"][data-rv="pending"] { opacity: 1; transform: scale(var(--lx, 0), var(--ly, 1)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sx-scope *, .sx-scope *::before, .sx-scope *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

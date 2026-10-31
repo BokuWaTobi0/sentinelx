@@ -15,7 +15,7 @@
 | Import | Bounded CSV/JSON preview and explicit confirmation through the ordinary event validation and idempotent detection pipeline |
 | Notifications | Per-user in-app inbox, role/action routing, recipient-scoped read state, and authenticated cursor polling on every workspace page |
 | Report export | JSON and vector PDF generated from a repeatable-read database snapshot; Admin-only audit section is additionally role-gated |
-| Architecture explorer | Six-step scroll-based path with `IntersectionObserver`; all steps show if the API is unavailable or reduced motion is requested |
+| Explore story | Seven-step plain-language scroll story (`src/components/explore`) with a sticky illustration; all steps show if `IntersectionObserver` is unavailable or reduced motion is requested |
 
 ## Data relationships
 users -> sessions; events -> alerts/evidence; alerts -> response_requests, automation_jobs, incident_history and notifications; alerts.assigned_to references one optional active Analyst; detection_cooldowns -> alerts; detection_config_current -> immutable detection_config_versions; mutations -> audit_logs. Migrations 001–009 are additive, versioned and applied transactionally. Collaboration history stores only explicit safe event types and is never composed from restricted Admin audit metadata. Notifications are keyed to one recipient account and a unique deduplication key.
